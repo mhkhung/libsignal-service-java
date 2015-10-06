@@ -19,9 +19,13 @@ public class AccountAttributes {
   @JsonProperty
   private boolean voice;
 
-  public AccountAttributes(String signalingKey, int registrationId, boolean voice) {
-    this.signalingKey   = signalingKey;
-    this.registrationId = registrationId;
+  @JsonProperty
+  private boolean fetchesMessages;
+
+  public AccountAttributes(String signalingKey, int registrationId, boolean voice, boolean fetchesMessages) {
+    this.signalingKey    = signalingKey;
+    this.fetchesMessages = fetchesMessages;
+    this.registrationId  = registrationId;
     this.voice          = voice;
   }
 
