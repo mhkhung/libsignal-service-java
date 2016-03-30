@@ -30,6 +30,7 @@ import org.whispersystems.signalservice.api.push.exceptions.EncapsulatedExceptio
 import org.whispersystems.signalservice.api.push.exceptions.NetworkFailureException;
 import org.whispersystems.signalservice.api.push.exceptions.PushNetworkException;
 import org.whispersystems.signalservice.api.push.exceptions.UnregisteredUserException;
+import org.whispersystems.signalservice.api.util.CredentialsProvider;
 import org.whispersystems.signalservice.internal.push.MismatchedDevices;
 import org.whispersystems.signalservice.internal.push.OutgoingPushMessage;
 import org.whispersystems.signalservice.internal.push.OutgoingPushMessageList;
@@ -64,6 +65,7 @@ public class SignalServiceMessageSender {
   private final SignalProtocolStore     store;
   private final SignalServiceAddress localAddress;
   private final Optional<EventListener> eventListener;
+  private final CredentialsProvider     credentialsProvider;
 
   /**
    * Construct a SignalServiceMessageSender.
@@ -83,7 +85,8 @@ public class SignalServiceMessageSender {
                                     String userAgent,
                                     Optional<EventListener> eventListener)
   {
-    this.socket        = new PushServiceSocket(url, trustStore, new StaticCredentialsProvider(user, password, null, deviceId), userAgent);
+    this.credentialsProvider = new StaticCredentialsProvider(user, password, null, deviceId);
+    this.socket        = new PushServiceSocket(url, trustStore, credentialsProvider, userAgent);
     this.store         = store;
     this.localAddress  = new SignalServiceAddress(user);
     this.eventListener = eventListener;
@@ -106,7 +109,8 @@ public class SignalServiceMessageSender {
                                     String userAgent,
                                     Optional<EventListener> eventListener)
   {
-    this.socket        = new PushServiceSocket(url, trustStore, new StaticCredentialsProvider(user, password, null, -1), userAgent);
+    this.credentialsProvider = new StaticCredentialsProvider(user, password, null, SignalServiceAddress.DEFAULT_DEVICE_ID);
+    this.socket        = new PushServiceSocket(url, trustStore, credentialsProvider, userAgent);
     this.store         = store;
     this.localAddress  = new SignalServiceAddress(user);
     this.eventListener = eventListener;
@@ -422,7 +426,7 @@ public class SignalServiceMessageSender {
   {
     List<OutgoingPushMessage> messages = new LinkedList<>();
 
-    if (!recipient.equals(localAddress)) {
+    if (!(recipient.equals(localAddress) && credentialsProvider.getDeviceId() == SignalServiceAddress.DEFAULT_DEVICE_ID)) {
       messages.add(getEncryptedMessage(socket, recipient, SignalServiceAddress.DEFAULT_DEVICE_ID, plaintext, legacy));
     }
 
