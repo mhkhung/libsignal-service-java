@@ -5,8 +5,9 @@
  */
 package org.whispersystems.signalservice.api;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
+import java.io.IOException;
+import java.util.LinkedList;
+import java.util.List;
 
 import org.whispersystems.libsignal.InvalidKeyException;
 import org.whispersystems.libsignal.SessionBuilder;
@@ -23,6 +24,7 @@ import org.whispersystems.signalservice.api.messages.SignalServiceDataMessage;
 import org.whispersystems.signalservice.api.messages.SignalServiceGroup;
 import org.whispersystems.signalservice.api.messages.multidevice.BlockedListMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.ReadMessage;
+import org.whispersystems.signalservice.api.messages.multidevice.RequestMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.SignalServiceSyncMessage;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.api.push.TrustStore;
@@ -48,9 +50,8 @@ import org.whispersystems.signalservice.internal.push.exceptions.StaleDevicesExc
 import org.whispersystems.signalservice.internal.util.StaticCredentialsProvider;
 import org.whispersystems.signalservice.internal.util.Util;
 
-import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.InvalidProtocolBufferException;
 
 /**
  * The main interface for sending Signal Service messages.
@@ -195,6 +196,8 @@ public class SignalServiceMessageSender {
       content = createMultiDeviceReadContent(message.getRead().get());
     } else if (message.getBlockedList().isPresent()) {
       content = createMultiDeviceBlockedContent(message.getBlockedList().get());
+    } else if (message.getRequest().isPresent()) {
+      content = createRequestContent(message.getRequest().get());
     } else {
       throw new IOException("Unsupported sync message!");
     }
@@ -287,6 +290,15 @@ public class SignalServiceMessageSender {
                                       .setSender(readMessage.getSender()));
     }
 
+    return container.setSyncMessage(builder).build().toByteArray();
+  }
+  
+  private byte[] createRequestContent(RequestMessage request) {
+    Content.Builder     container = Content.newBuilder();
+    SyncMessage.Builder builder   = SyncMessage.newBuilder();
+    
+    builder.setRequest(request.getRequest());
+    
     return container.setSyncMessage(builder).build().toByteArray();
   }
 

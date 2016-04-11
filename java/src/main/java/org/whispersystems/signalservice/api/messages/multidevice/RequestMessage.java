@@ -27,4 +27,8 @@ public class RequestMessage {
   public boolean isBlockedListRequest() {
     return request.getType() == Request.Type.BLOCKED;
   }
+  
+  public Request getRequest() {
+    return request;
+  }
 }
