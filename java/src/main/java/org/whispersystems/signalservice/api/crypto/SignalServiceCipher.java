@@ -193,8 +193,18 @@ public class SignalServiceCipher {
     
     if(content.hasContacts()) {
       AttachmentPointer pointer = content.getContacts().getBlob();
-      return SignalServiceSyncMessage.forContacts(new SignalServiceAttachmentPointer(pointer.getId(), 
-          pointer.getContentType(), pointer.getKey().toByteArray(), envelope.getRelay()));
+      return SignalServiceSyncMessage.forContacts(new SignalServiceAttachmentPointer(pointer.getId(),
+          pointer.getContentType(), pointer.getKey().toByteArray(), envelope.getRelay(),
+          pointer.hasSize() ? Optional.of(pointer.getSize()) : Optional.<Integer>absent(),
+          pointer.hasThumbnail() ? Optional.of(pointer.getThumbnail().toByteArray()): Optional.<byte[]>absent()));
+    }
+
+    if(content.hasGroups()) {
+      AttachmentPointer pointer = content.getGroups().getBlob();
+      return SignalServiceSyncMessage.forGroups(new SignalServiceAttachmentPointer(pointer.getId(),
+          pointer.getContentType(), pointer.getKey().toByteArray(), envelope.getRelay(),
+          pointer.hasSize() ? Optional.of(pointer.getSize()) : Optional.<Integer>absent(),
+          pointer.hasThumbnail() ? Optional.of(pointer.getThumbnail().toByteArray()): Optional.<byte[]>absent()));
     }
 
     return SignalServiceSyncMessage.empty();
