@@ -47,7 +47,9 @@ android {
             }
         }
     }
-
+    lintOptions {
+        warning 'InvalidPackage'
+    }
 }
 
 tasks.whenTaskAdded { task ->
