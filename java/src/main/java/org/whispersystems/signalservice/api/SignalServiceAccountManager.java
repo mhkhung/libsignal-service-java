@@ -25,6 +25,7 @@ import org.whispersystems.libsignal.ecc.ECPrivateKey;
 import org.whispersystems.libsignal.ecc.ECPublicKey;
 import org.whispersystems.libsignal.state.PreKeyRecord;
 import org.whispersystems.libsignal.state.SignedPreKeyRecord;
+import org.whispersystems.libsignal.util.ByteUtil;
 import org.whispersystems.libsignal.util.guava.Optional;
 import org.whispersystems.signalservice.api.messages.multidevice.DeviceInfo;
 import org.whispersystems.signalservice.api.push.ContactTokenDetails;
@@ -376,8 +377,16 @@ public class SignalServiceAccountManager {
     ProvisionMessage msg = provisioningSocket.getProvisioningMessage(tempIdentity);
     credentialsProvider.setUser(msg.getNumber());
     String provisioningCode = msg.getProvisioningCode();
-    ECPublicKey publicKey = Curve.decodePoint(msg.getIdentityKeyPublic().toByteArray(), 0);
-    ECPrivateKey privateKey = Curve.decodePrivatePoint(msg.getIdentityKeyPrivate().toByteArray());
+    byte[] publicKeyBytes = msg.getIdentityKeyPublic().toByteArray();
+    if (publicKeyBytes.length == 32) {
+      // The public key is missing the type specifier, probably from iOS
+      // Signal-Desktop handles this by ignoring the sent public key and regenerating it from the private key
+      byte[] type = {Curve.DJB_TYPE};
+      publicKeyBytes = ByteUtil.combine(type, publicKeyBytes);
+    }
+    ECPublicKey publicKey = Curve.decodePoint(publicKeyBytes, 0);
+    final byte[] privateKeyBytes = msg.getIdentityKeyPrivate().toByteArray();
+    ECPrivateKey privateKey = Curve.decodePrivatePoint(privateKeyBytes);
     IdentityKeyPair identity = new IdentityKeyPair(new IdentityKey(publicKey), privateKey);
     int deviceId = this.pushServiceSocket.finishNewDeviceRegistration(provisioningCode, signalingKey, supportsSms, fetchesMessages, registrationId, deviceName);
     credentialsProvider.setDeviceId(deviceId);
