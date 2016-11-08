@@ -24,9 +24,13 @@ public class AccountAttributes {
 
   public AccountAttributes(String signalingKey, int registrationId, boolean voice, boolean fetchesMessages) {
     this.signalingKey    = signalingKey;
-    this.fetchesMessages = fetchesMessages;
     this.registrationId  = registrationId;
-    this.voice          = voice;
+    this.voice           = voice;
+    this.fetchesMessages = fetchesMessages;
+  }
+
+  public AccountAttributes(String signalingKey, int registrationId, boolean voice) {
+    this(signalingKey, registrationId, voice, false);
   }
 
   public AccountAttributes() {}
