@@ -5,7 +5,6 @@ import java.util.concurrent.TimeoutException;
 
 import org.whispersystems.libsignal.IdentityKeyPair;
 import org.whispersystems.libsignal.InvalidKeyException;
-import org.whispersystems.signalservice.api.push.TrustStore;
 import org.whispersystems.signalservice.internal.crypto.ProvisioningCipher;
 import org.whispersystems.signalservice.internal.push.ProvisioningProtos.ProvisionMessage;
 import org.whispersystems.signalservice.internal.push.ProvisioningProtos.ProvisioningUuid;
@@ -19,8 +18,10 @@ public class ProvisioningSocket {
   private WebSocketConnection connection;
   private boolean connected = false;
   
-  public ProvisioningSocket(String url, TrustStore trustStore, String userAgent) {
-    connection = new WebSocketConnection(url, trustStore, userAgent);
+  public ProvisioningSocket(SignalServiceUrl[] serviceUrls, String userAgent) {
+    // TODO uses first url, like in SignalServiceMessageReceiver
+    // TODO should probably make this random, like in PushServiceSocket
+    connection = new WebSocketConnection(serviceUrls[0].getUrl(), serviceUrls[0].getTrustStore(), userAgent);
   }
   
   public ProvisioningUuid getProvisioningUuid() throws TimeoutException, IOException {

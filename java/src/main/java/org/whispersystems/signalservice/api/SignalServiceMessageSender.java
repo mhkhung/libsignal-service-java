@@ -44,6 +44,7 @@ import org.whispersystems.signalservice.internal.push.SignalServiceProtos.Conten
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos.DataMessage;
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos.GroupContext;
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos.SyncMessage;
+import org.whispersystems.signalservice.internal.push.SignalServiceUrl;
 import org.whispersystems.signalservice.internal.push.StaleDevices;
 import org.whispersystems.signalservice.internal.push.exceptions.MismatchedDevicesException;
 import org.whispersystems.signalservice.internal.push.exceptions.StaleDevicesException;
@@ -71,8 +72,7 @@ public class SignalServiceMessageSender {
   /**
    * Construct a SignalServiceMessageSender.
    *
-   * @param url The URL of the Signal Service.
-   * @param trustStore The trust store containing the Signal Service's signing TLS certificate.
+   * @param urls The URL of the Signal Service.
    * @param user The Signal Service username (eg phone number).
    * @param password The Signal Service user password.
    * @param deviceId A integer which is provided by the server while linking.
@@ -80,14 +80,14 @@ public class SignalServiceMessageSender {
    * @param eventListener An optional event listener, which fires whenever sessions are
    *                      setup or torn down for a recipient.
    */
-  public SignalServiceMessageSender(String url, TrustStore trustStore,
+  public SignalServiceMessageSender(SignalServiceUrl[] urls,
                                     String user, String password, int deviceId,
                                     SignalProtocolStore store,
                                     String userAgent,
                                     Optional<EventListener> eventListener)
   {
     this.credentialsProvider = new StaticCredentialsProvider(user, password, null, deviceId);
-    this.socket        = new PushServiceSocket(url, trustStore, credentialsProvider, userAgent);
+    this.socket        = new PushServiceSocket(urls, credentialsProvider, userAgent);
     this.store         = store;
     this.localAddress  = new SignalServiceAddress(user);
     this.eventListener = eventListener;
@@ -96,22 +96,21 @@ public class SignalServiceMessageSender {
   /**
    * Construct a SignalServiceMessageSender.
    *
-   * @param url The URL of the Signal Service.
-   * @param trustStore The trust store containing the Signal Service's signing TLS certificate.
+   * @param urls The URL of the Signal Service.
    * @param user The Signal Service username (eg phone number).
    * @param password The Signal Service user password.
    * @param store The SignalProtocolStore.
    * @param eventListener An optional event listener, which fires whenever sessions are
    *                      setup or torn down for a recipient.
    */
-  public SignalServiceMessageSender(String url, TrustStore trustStore,
+  public SignalServiceMessageSender(SignalServiceUrl[] urls,
                                     String user, String password,
                                     SignalProtocolStore store,
                                     String userAgent,
                                     Optional<EventListener> eventListener)
   {
     this.credentialsProvider = new StaticCredentialsProvider(user, password, null, SignalServiceAddress.DEFAULT_DEVICE_ID);
-    this.socket        = new PushServiceSocket(url, trustStore, credentialsProvider, userAgent);
+    this.socket        = new PushServiceSocket(urls, credentialsProvider, userAgent);
     this.store         = store;
     this.localAddress  = new SignalServiceAddress(user);
     this.eventListener = eventListener;

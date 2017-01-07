@@ -6,23 +6,14 @@
 
 package org.whispersystems.signalservice.internal.push;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.security.KeyManagementException;
-import java.security.NoSuchAlgorithmException;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
-
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.squareup.okhttp.Interceptor;
+import com.squareup.okhttp.MediaType;
+import com.squareup.okhttp.OkHttpClient;
+import com.squareup.okhttp.Request;
+import com.squareup.okhttp.RequestBody;
+import com.squareup.okhttp.Response;
 
 import org.apache.http.conn.ssl.StrictHostnameVerifier;
 import org.whispersystems.libsignal.IdentityKey;
@@ -38,7 +29,6 @@ import org.whispersystems.signalservice.api.messages.multidevice.DeviceInfo;
 import org.whispersystems.signalservice.api.push.ContactTokenDetails;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.api.push.SignedPreKeyEntity;
-import org.whispersystems.signalservice.api.push.TrustStore;
 import org.whispersystems.signalservice.api.push.exceptions.AuthorizationFailedException;
 import org.whispersystems.signalservice.api.push.exceptions.ExpectationFailedException;
 import org.whispersystems.signalservice.api.push.exceptions.NonSuccessfulResponseCodeException;
@@ -54,13 +44,24 @@ import org.whispersystems.signalservice.internal.util.BlacklistingTrustManager;
 import org.whispersystems.signalservice.internal.util.JsonUtil;
 import org.whispersystems.signalservice.internal.util.Util;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.squareup.okhttp.MediaType;
-import com.squareup.okhttp.OkHttpClient;
-import com.squareup.okhttp.Request;
-import com.squareup.okhttp.RequestBody;
-import com.squareup.okhttp.Response;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
+
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
 
 /**
  *
@@ -96,17 +97,24 @@ public class PushServiceSocket {
   private static final String RECEIPT_PATH              = "/v1/receipt/%s/%d";
   private static final String ATTACHMENT_PATH           = "/v1/attachments/%s";
 
-  private final String              serviceUrl;
-  private final TrustManager[]      trustManagers;
-  private final CredentialsProvider credentialsProvider;
-  private final String              userAgent;
+  private final SignalConnectionInformation[] signalConnectionInformation;
+  private final CredentialsProvider           credentialsProvider;
+  private final String                        userAgent;
+  private final SecureRandom                  random;
 
-  public PushServiceSocket(String serviceUrl, TrustStore trustStore, CredentialsProvider credentialsProvider, String userAgent)
-  {
-    this.serviceUrl          = serviceUrl;
-    this.credentialsProvider = credentialsProvider;
-    this.trustManagers       = BlacklistingTrustManager.createFor(trustStore);
-    this.userAgent           = userAgent;
+  public PushServiceSocket(SignalServiceUrl[] serviceUrls, CredentialsProvider credentialsProvider, String userAgent) {
+    try {
+      this.credentialsProvider         = credentialsProvider;
+      this.userAgent                   = userAgent;
+      this.signalConnectionInformation = new SignalConnectionInformation[serviceUrls.length];
+      this.random                      = SecureRandom.getInstance("SHA1PRNG");
+
+      for (int i = 0; i < serviceUrls.length; i++) {
+        signalConnectionInformation[i] = new SignalConnectionInformation(serviceUrls[i]);
+      }
+    } catch (NoSuchAlgorithmException e) {
+      throw new AssertionError(e);
+    }
   }
 
   public void createAccount(boolean voice) throws IOException {
@@ -563,8 +571,13 @@ public class PushServiceSocket {
       throws PushNetworkException
   {
     try {
-      Log.w(TAG, "Push service URL: " + serviceUrl);
-      Log.w(TAG, "Opening URL: " + String.format("%s%s", serviceUrl, urlFragment));
+      SignalConnectionInformation connectionInformation = getRandom(signalConnectionInformation, random);
+      String                      url                   = connectionInformation.getUrl();
+      Optional<String>            hostHeader            = connectionInformation.getHostHeader();
+      TrustManager[]              trustManagers         = connectionInformation.getTrustManagers();
+
+      Log.w(TAG, "Push service URL: " + url);
+      Log.w(TAG, "Opening URL: " + String.format("%s%s", url, urlFragment));
 
       SSLContext context = SSLContext.getInstance("TLS");
       context.init(null, trustManagers, null);
@@ -574,7 +587,7 @@ public class PushServiceSocket {
       okHttpClient.setHostnameVerifier(new StrictHostnameVerifier());
 
       Request.Builder request = new Request.Builder();
-      request.url(String.format("%s%s", serviceUrl, urlFragment));
+      request.url(String.format("%s%s", url, urlFragment));
 
       if (body != null) {
         request.method(method, RequestBody.create(MediaType.parse("application/json"), body));
@@ -588,6 +601,10 @@ public class PushServiceSocket {
 
       if (userAgent != null) {
         request.addHeader("X-Signal-Agent", userAgent);
+      }
+
+      if (hostHeader.isPresent()) {
+        okHttpClient.networkInterceptors().add(new HostInterceptor(hostHeader.get()));
       }
 
       return okHttpClient.newCall(request.build()).execute();
@@ -608,6 +625,12 @@ public class PushServiceSocket {
     } catch (UnsupportedEncodingException e) {
       throw new AssertionError(e);
     }
+  }
+
+  private SignalConnectionInformation getRandom(SignalConnectionInformation[] connections,
+                                                SecureRandom random)
+  {
+    return connections[random.nextInt(connections.length)];
   }
 
   private static class GcmRegistrationId {
@@ -639,6 +662,46 @@ public class PushServiceSocket {
 
     public String getLocation() {
       return location;
+    }
+  }
+
+  private static class HostInterceptor implements Interceptor {
+
+    private final String host;
+
+    HostInterceptor(String host) {
+      this.host = host;
+    }
+
+    @Override
+    public Response intercept(Chain chain) throws IOException {
+      Request request = chain.request();
+      return chain.proceed(request.newBuilder().header("Host", host).build());
+    }
+  }
+
+  private static class SignalConnectionInformation {
+
+    private final String           url;
+    private final Optional<String> hostHeader;
+    private final TrustManager[]   trustManagers;
+
+    private SignalConnectionInformation(SignalServiceUrl signalServiceUrl) {
+      this.url           = signalServiceUrl.getUrl();
+      this.hostHeader    = signalServiceUrl.getHostHeader();
+      this.trustManagers = BlacklistingTrustManager.createFor(signalServiceUrl.getTrustStore());
+    }
+
+    String getUrl() {
+      return url;
+    }
+
+    Optional<String> getHostHeader() {
+      return hostHeader;
+    }
+
+    TrustManager[] getTrustManagers() {
+      return trustManagers;
     }
   }
 }
