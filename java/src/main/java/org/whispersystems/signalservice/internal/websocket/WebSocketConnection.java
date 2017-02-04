@@ -78,7 +78,12 @@ public class WebSocketConnection extends WebSocketListener {
     Log.w(TAG, "WSC connect()...");
 
     if (client == null) {
-      String                                   filledUri     = String.format(wsUri, credentialsProvider.getUser(), credentialsProvider.getPassword());
+      String filledUri;
+      if (credentialsProvider != null) {
+        filledUri = String.format(wsUri, credentialsProvider.getUser(), credentialsProvider.getPassword());
+      } else {
+        filledUri = wsUri;
+      }
       Pair<SSLSocketFactory, X509TrustManager> socketFactory = createTlsSocketFactory(trustStore);
 
       OkHttpClient okHttpClient = new OkHttpClient.Builder()
