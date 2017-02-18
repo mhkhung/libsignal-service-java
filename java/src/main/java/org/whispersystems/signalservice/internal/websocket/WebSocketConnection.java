@@ -4,6 +4,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 
 import org.whispersystems.libsignal.logging.Log;
 import org.whispersystems.libsignal.util.Pair;
+import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.api.push.TrustStore;
 import org.whispersystems.signalservice.api.util.CredentialsProvider;
 import org.whispersystems.signalservice.internal.util.BlacklistingTrustManager;
@@ -80,7 +81,11 @@ public class WebSocketConnection extends WebSocketListener {
     if (client == null) {
       String filledUri;
       if (credentialsProvider != null) {
-        filledUri = String.format(wsUri, credentialsProvider.getUser(), credentialsProvider.getPassword());
+        if (credentialsProvider.getDeviceId() == SignalServiceAddress.DEFAULT_DEVICE_ID) {
+          filledUri = String.format(wsUri, credentialsProvider.getUser(), credentialsProvider.getPassword());
+        } else {
+          filledUri = String.format(wsUri, credentialsProvider.getUser() + "." + credentialsProvider.getDeviceId(), credentialsProvider.getPassword());
+        }
       } else {
         filledUri = wsUri;
       }
