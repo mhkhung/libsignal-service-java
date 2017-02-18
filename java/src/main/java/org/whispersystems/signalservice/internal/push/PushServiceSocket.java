@@ -18,6 +18,7 @@ import org.whispersystems.libsignal.state.SignedPreKeyRecord;
 import org.whispersystems.libsignal.util.guava.Optional;
 import org.whispersystems.signalservice.api.crypto.AttachmentCipherOutputStream;
 import org.whispersystems.signalservice.api.messages.SignalServiceAttachment.ProgressListener;
+import org.whispersystems.signalservice.api.messages.calls.TurnServerInfo;
 import org.whispersystems.signalservice.api.messages.multidevice.DeviceInfo;
 import org.whispersystems.signalservice.api.push.ContactTokenDetails;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
@@ -49,17 +50,19 @@ import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
+import okhttp3.Call;
 import okhttp3.ConnectionSpec;
-import okhttp3.Interceptor;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Protocol;
@@ -83,6 +86,7 @@ public class PushServiceSocket {
   private static final String VERIFY_ACCOUNT_TOKEN_PATH = "/v1/accounts/token/%s";
   private static final String REGISTER_GCM_PATH         = "/v1/accounts/gcm/";
   private static final String REQUEST_TOKEN_PATH        = "/v1/accounts/token";
+  private static final String TURN_SERVER_INFO          = "/v1/accounts/turn";
   private static final String SET_ACCOUNT_ATTRIBUTES    = "/v1/accounts/attributes/";
 
   private static final String PREKEY_METADATA_PATH      = "/v2/keys/";
@@ -100,6 +104,9 @@ public class PushServiceSocket {
   private static final String ACKNOWLEDGE_MESSAGE_PATH  = "/v1/messages/%s/%d";
   private static final String RECEIPT_PATH              = "/v1/receipt/%s/%d";
   private static final String ATTACHMENT_PATH           = "/v1/attachments/%s";
+
+  private       long      soTimeoutMillis = TimeUnit.SECONDS.toMillis(30);
+  private final Set<Call> connections     = new HashSet<>();
 
   private final SignalConnectionInformation[] signalConnectionInformation;
   private final CredentialsProvider           credentialsProvider;
@@ -126,24 +133,24 @@ public class PushServiceSocket {
     makeRequest(String.format(path, credentialsProvider.getUser()), "GET", null);
   }
 
-  public void verifyAccountCode(String verificationCode, String signalingKey, int registrationId, boolean voice, boolean fetchesMessages)
+  public void verifyAccountCode(String verificationCode, String signalingKey, int registrationId, boolean voice, boolean video, boolean fetchesMessages)
       throws IOException
   {
-    AccountAttributes signalingKeyEntity = new AccountAttributes(signalingKey, registrationId, voice, fetchesMessages);
+    AccountAttributes signalingKeyEntity = new AccountAttributes(signalingKey, registrationId, voice, video, fetchesMessages);
     makeRequest(String.format(VERIFY_ACCOUNT_CODE_PATH, verificationCode),
                 "PUT", JsonUtil.toJson(signalingKeyEntity));
   }
 
-  public void verifyAccountToken(String verificationToken, String signalingKey, int registrationId, boolean voice, boolean fetchesMessages)
+  public void verifyAccountToken(String verificationToken, String signalingKey, int registrationId, boolean voice, boolean video, boolean fetchesMessages)
       throws IOException
   {
-    AccountAttributes signalingKeyEntity = new AccountAttributes(signalingKey, registrationId, voice, fetchesMessages);
+    AccountAttributes signalingKeyEntity = new AccountAttributes(signalingKey, registrationId, voice, video, fetchesMessages);
     makeRequest(String.format(VERIFY_ACCOUNT_TOKEN_PATH, verificationToken),
                 "PUT", JsonUtil.toJson(signalingKeyEntity));
   }
 
-  public void setAccountAttributes(String signalingKey, int registrationId, boolean voice, boolean fetchesMessages) throws IOException {
-    AccountAttributes accountAttributes = new AccountAttributes(signalingKey, registrationId, voice, fetchesMessages);
+  public void setAccountAttributes(String signalingKey, int registrationId, boolean voice, boolean video, boolean fetchesMessages) throws IOException {
+    AccountAttributes accountAttributes = new AccountAttributes(signalingKey, registrationId, voice, video, fetchesMessages);
     makeRequest(SET_ACCOUNT_ATTRIBUTES, "PUT", JsonUtil.toJson(accountAttributes));
   }
 
@@ -413,6 +420,25 @@ public class PushServiceSocket {
     }
   }
 
+  public TurnServerInfo getTurnServerInfo() throws IOException {
+    String response = makeRequest(TURN_SERVER_INFO, "GET", null);
+    return JsonUtil.fromJson(response, TurnServerInfo.class);
+  }
+
+  public void setSoTimeoutMillis(long soTimeoutMillis) {
+    this.soTimeoutMillis = soTimeoutMillis;
+  }
+
+  public void cancelInFlightRequests() {
+    synchronized (connections) {
+      Log.w(TAG, "Canceling: " + connections.size());
+      for (Call connection : connections) {
+        Log.w(TAG, "Canceling: " + connection);
+        connection.cancel();
+      }
+    }
+  }
+
   private void downloadExternalFile(String url, File localDestination, ProgressListener listener)
       throws IOException
   {
@@ -587,7 +613,9 @@ public class PushServiceSocket {
       context.init(null, trustManagers, null);
 
       OkHttpClient.Builder okHttpClientBuilder = new OkHttpClient.Builder()
-          .sslSocketFactory(context.getSocketFactory(), (X509TrustManager)trustManagers[0]);
+          .sslSocketFactory(context.getSocketFactory(), (X509TrustManager)trustManagers[0])
+          .connectTimeout(soTimeoutMillis, TimeUnit.MILLISECONDS)
+          .readTimeout(soTimeoutMillis, TimeUnit.MILLISECONDS);
 
       Request.Builder request = new Request.Builder();
       request.url(String.format("%s%s", url, urlFragment));
@@ -617,7 +645,19 @@ public class PushServiceSocket {
         request.addHeader("Host", hostHeader.get());
       }
 
-      return okHttpClientBuilder.build().newCall(request.build()).execute();
+      Call call = okHttpClientBuilder.build().newCall(request.build());
+
+      synchronized (connections) {
+        connections.add(call);
+      }
+
+      try {
+        return call.execute();
+      } finally {
+        synchronized (connections) {
+          connections.remove(call);
+        }
+      }
     } catch (IOException e) {
       throw new PushNetworkException(e);
     } catch (NoSuchAlgorithmException | KeyManagementException e) {

@@ -8,9 +8,6 @@ package org.whispersystems.signalservice.api.crypto;
 
 import static org.whispersystems.signalservice.internal.push.SignalServiceProtos.GroupContext.Type.DELIVER;
 
-import java.util.LinkedList;
-import java.util.List;
-
 import org.whispersystems.libsignal.DuplicateMessageException;
 import org.whispersystems.libsignal.InvalidKeyException;
 import org.whispersystems.libsignal.InvalidKeyIdException;
@@ -32,6 +29,12 @@ import org.whispersystems.signalservice.api.messages.SignalServiceContent;
 import org.whispersystems.signalservice.api.messages.SignalServiceDataMessage;
 import org.whispersystems.signalservice.api.messages.SignalServiceEnvelope;
 import org.whispersystems.signalservice.api.messages.SignalServiceGroup;
+import org.whispersystems.signalservice.api.messages.calls.AnswerMessage;
+import org.whispersystems.signalservice.api.messages.calls.BusyMessage;
+import org.whispersystems.signalservice.api.messages.calls.HangupMessage;
+import org.whispersystems.signalservice.api.messages.calls.IceUpdateMessage;
+import org.whispersystems.signalservice.api.messages.calls.OfferMessage;
+import org.whispersystems.signalservice.api.messages.calls.SignalServiceCallMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.BlockedListMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.ReadMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.RequestMessage;
@@ -49,6 +52,12 @@ import org.whispersystems.signalservice.internal.push.SignalServiceProtos.SyncMe
 import org.whispersystems.signalservice.internal.util.Base64;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+
+import java.util.LinkedList;
+import java.util.List;
+
+import static org.whispersystems.signalservice.internal.push.SignalServiceProtos.CallMessage;
+import static org.whispersystems.signalservice.internal.push.SignalServiceProtos.GroupContext.Type.DELIVER;
 
 /**
  * This is used to decrypt received {@link SignalServiceEnvelope}s.
@@ -119,6 +128,8 @@ public class SignalServiceCipher {
           content = new SignalServiceContent(createSignalServiceMessage(envelope, message.getDataMessage()));
         } else if (message.hasSyncMessage() && localAddress.getNumber().equals(envelope.getSource())) {
           content = new SignalServiceContent(createSynchronizeMessage(envelope, message.getSyncMessage()));
+        } else if (message.hasCallMessage()) {
+          content = new SignalServiceContent(createCallMessage(message.getCallMessage()));
         }
       }
 
@@ -216,6 +227,32 @@ public class SignalServiceCipher {
     }
 
     return SignalServiceSyncMessage.empty();
+  }
+
+  private SignalServiceCallMessage createCallMessage(CallMessage content) {
+    if (content.hasOffer()) {
+      CallMessage.Offer offerContent = content.getOffer();
+      return SignalServiceCallMessage.forOffer(new OfferMessage(offerContent.getId(), offerContent.getDescription()));
+    } else if (content.hasAnswer()) {
+      CallMessage.Answer answerContent = content.getAnswer();
+      return SignalServiceCallMessage.forAnswer(new AnswerMessage(answerContent.getId(), answerContent.getDescription()));
+    } else if (content.getIceUpdateCount() > 0) {
+      List<IceUpdateMessage> iceUpdates = new LinkedList<>();
+
+      for (CallMessage.IceUpdate iceUpdate : content.getIceUpdateList()) {
+        iceUpdates.add(new IceUpdateMessage(iceUpdate.getId(), iceUpdate.getSdpMid(), iceUpdate.getSdpMLineIndex(), iceUpdate.getSdp()));
+      }
+
+      return SignalServiceCallMessage.forIceUpdates(iceUpdates);
+    } else if (content.hasHangup()) {
+      CallMessage.Hangup hangup = content.getHangup();
+      return SignalServiceCallMessage.forHangup(new HangupMessage(hangup.getId()));
+    } else if (content.hasBusy()) {
+      CallMessage.Busy busy = content.getBusy();
+      return SignalServiceCallMessage.forBusy(new BusyMessage(busy.getId()));
+    }
+
+    return SignalServiceCallMessage.empty();
   }
 
   private SignalServiceGroup createGroupInfo(SignalServiceEnvelope envelope, DataMessage content) {
