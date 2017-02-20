@@ -54,4 +54,8 @@ public class AccountAttributes {
   public boolean isVideo() {
     return video;
   }
+
+  public boolean isFetchesMessages() {
+    return fetchesMessages;
+  }
 }

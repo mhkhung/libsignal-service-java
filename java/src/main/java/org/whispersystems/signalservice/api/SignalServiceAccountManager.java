@@ -139,30 +139,6 @@ public class SignalServiceAccountManager {
    *
    * @throws IOException
    */
-  public void verifyAccountWithCode(String verificationCode, String signalingKey, int signalProtocolRegistrationId, boolean voice, boolean video)
-          throws IOException
-  {
-    verifyAccountWithCode(verificationCode, signalingKey, signalProtocolRegistrationId, voice, video, false);
-  }
-
-  /**
-   * Verify a Signal Service account with a received SMS or voice verification code.
-   *
-   * @param verificationCode The verification code received via SMS or Voice
-   *                         (see {@link #requestSmsVerificationCode} and
-   *                         {@link #requestVoiceVerificationCode}).
-   * @param signalingKey 52 random bytes.  A 32 byte AES key and a 20 byte Hmac256 key,
-   *                     concatenated.
-   * @param signalProtocolRegistrationId A random 14-bit number that identifies this Signal install.
-   *                              This value should remain consistent across registrations for the
-   *                              same install, but probabilistically differ across registrations
-   *                              for separate installs.
-   * @param voice A boolean that indicates whether the client supports secure voice (RedPhone) calls.
-   * @param fetchesMessages Indicate whether this client fetches messages instead of relying on APN
-   *                        or GCM push messages.
-   *
-   * @throws IOException
-   */
   public void verifyAccountWithCode(String verificationCode, String signalingKey, int signalProtocolRegistrationId, boolean voice, boolean video, boolean fetchesMessages)
       throws IOException
   {
@@ -186,29 +162,6 @@ public class SignalServiceAccountManager {
    *
    * @throws IOException
    */
-  public void verifyAccountWithToken(String verificationToken, String signalingKey, int signalProtocolRegistrationId, boolean voice, boolean video)
-          throws IOException
-  {
-    verifyAccountWithToken(verificationToken, signalingKey, signalProtocolRegistrationId, voice, video, false);
-  }
-
-  /**
-   * Verify a Signal Service account with a signed token from a trusted source.
-   *
-   * @param verificationToken The signed token provided by a trusted server.
-
-   * @param signalingKey 52 random bytes.  A 32 byte AES key and a 20 byte Hmac256 key,
-   *                     concatenated.
-   * @param signalProtocolRegistrationId A random 14-bit number that identifies this Signal install.
-   *                              This value should remain consistent across registrations for the
-   *                              same install, but probabilistically differ across registrations
-   *                              for separate installs.
-   * @param voice A boolean that indicates whether the client supports secure voice (RedPhone) calls.
-   * @param fetchesMessages Indicate whether this client fetches messages instead of relying on APN
-   *                        or GCM push messages.
-   *
-   * @throws IOException
-   */
   public void verifyAccountWithToken(String verificationToken, String signalingKey, int signalProtocolRegistrationId, boolean voice, boolean video, boolean fetchesMessages)
       throws IOException
   {
@@ -224,26 +177,6 @@ public class SignalServiceAccountManager {
    *                                     install, but probabilistically differ across registrations for
    *                                     separate installs.
    * @param voice A boolean that indicates whether the client supports secure voice (RedPhone)
-   *
-   * @throws IOException
-   */
-  public void setAccountAttributes(String signalingKey, int signalProtocolRegistrationId, boolean voice, boolean video)
-          throws IOException
-  {
-    setAccountAttributes(signalingKey, signalProtocolRegistrationId, voice, video, false);
-  }
-
-  /**
-   * Refresh account attributes with server.
-   *
-   * @param signalingKey 52 random bytes.  A 32 byte AES key and a 20 byte Hmac256 key, concatenated.
-   * @param signalProtocolRegistrationId A random 14-bit number that identifies this Signal install.
-   *                              This value should remain consistent across registrations for the same
-   *                              install, but probabilistically differ across registrations for
-   *                              separate installs.
-   * @param voice A boolean that indicates whether the client supports secure voice (RedPhone)
-   * @param fetchesMessages Indicate whether this client fetches messages instead of relying on APN
-   *                        or GCM push messages.
    *
    * @throws IOException
    */
