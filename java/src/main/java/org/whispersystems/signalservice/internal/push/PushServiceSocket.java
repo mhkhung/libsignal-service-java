@@ -15,6 +15,7 @@ import org.whispersystems.libsignal.logging.Log;
 import org.whispersystems.libsignal.state.PreKeyBundle;
 import org.whispersystems.libsignal.state.PreKeyRecord;
 import org.whispersystems.libsignal.state.SignedPreKeyRecord;
+import org.whispersystems.libsignal.util.Pair;
 import org.whispersystems.libsignal.util.guava.Optional;
 import org.whispersystems.signalservice.api.crypto.AttachmentCipherOutputStream;
 import org.whispersystems.signalservice.api.messages.SignalServiceAttachment.ProgressListener;
@@ -365,7 +366,7 @@ public class PushServiceSocket {
     makeRequest(SIGNED_PREKEY_PATH, "PUT", JsonUtil.toJson(signedPreKeyEntity));
   }
 
-  public long sendAttachment(PushAttachmentData attachment) throws IOException {
+  public Pair<Long, byte[]> sendAttachment(PushAttachmentData attachment) throws IOException {
     String               response      = makeRequest(String.format(ATTACHMENT_PATH, ""), "GET", null);
     AttachmentDescriptor attachmentKey = JsonUtil.fromJson(response, AttachmentDescriptor.class);
 
@@ -375,13 +376,13 @@ public class PushServiceSocket {
 
     Log.w(TAG, "Got attachment content location: " + attachmentKey.getLocation());
 
-    uploadAttachment("PUT", attachmentKey.getLocation(), attachment.getData(),
-                     attachment.getDataSize(), attachment.getKey(), attachment.getListener());
+    byte[] digest = uploadAttachment("PUT", attachmentKey.getLocation(), attachment.getData(),
+                                     attachment.getDataSize(), attachment.getKey(), attachment.getListener());
 
-    return attachmentKey.getId();
+    return new Pair<>(attachmentKey.getId(), digest);
   }
 
-  public void retrieveAttachment(String relay, long attachmentId, File destination, ProgressListener listener) throws IOException {
+  public void retrieveAttachment(String relay, long attachmentId, File destination, int maxSizeBytes, ProgressListener listener) throws IOException {
     String path = String.format(ATTACHMENT_PATH, String.valueOf(attachmentId));
 
     if (!Util.isEmpty(relay)) {
@@ -393,7 +394,7 @@ public class PushServiceSocket {
 
     Log.w(TAG, "Attachment: " + attachmentId + " is at: " + descriptor.getLocation());
 
-    downloadExternalFile(descriptor.getLocation(), destination, listener);
+    downloadExternalFile(descriptor.getLocation(), destination, maxSizeBytes, listener);
   }
 
   public List<ContactTokenDetails> retrieveDirectory(Set<String> contactTokens)
@@ -439,7 +440,7 @@ public class PushServiceSocket {
     }
   }
 
-  private void downloadExternalFile(String url, File localDestination, ProgressListener listener)
+  private void downloadExternalFile(String url, File localDestination, int maxSizeBytes, ProgressListener listener)
       throws IOException
   {
     URL               downloadUrl = new URL(url);
@@ -459,9 +460,18 @@ public class PushServiceSocket {
       int          contentLength = connection.getContentLength();
       int         read,totalRead = 0;
 
+      if (contentLength > maxSizeBytes) {
+        throw new NonSuccessfulResponseCodeException("File exceeds maximum size.");
+      }
+
       while ((read = input.read(buffer)) != -1) {
         output.write(buffer, 0, read);
         totalRead += read;
+
+        if (totalRead > maxSizeBytes) {
+          localDestination.delete();
+          throw new NonSuccessfulResponseCodeException("File exceeds maximum size.");
+        }
 
         if (listener != null) {
           listener.onAttachmentProgress(contentLength, totalRead);
@@ -477,8 +487,8 @@ public class PushServiceSocket {
     }
   }
 
-  private void uploadAttachment(String method, String url, InputStream data,
-                                long dataSize, byte[] key, ProgressListener listener)
+  private byte[] uploadAttachment(String method, String url, InputStream data,
+                                  long dataSize, byte[] key, ProgressListener listener)
     throws IOException
   {
     URL                uploadUrl  = new URL(url);
@@ -518,6 +528,8 @@ public class PushServiceSocket {
       if (connection.getResponseCode() != 200) {
         throw new IOException("Bad response: " + connection.getResponseCode() + " " + connection.getResponseMessage());
       }
+
+      return out.getAttachmentDigest();
     } finally {
       connection.disconnect();
     }

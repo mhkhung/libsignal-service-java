@@ -12,7 +12,7 @@ import org.whispersystems.signalservice.api.SignalServiceMessageReceiver;
 /**
  * Represents a received SignalServiceAttachment "handle."  This
  * is a pointer to the actual attachment content, which needs to be
- * retrieved using {@link SignalServiceMessageReceiver#retrieveAttachment(SignalServiceAttachmentPointer, java.io.File)}
+ * retrieved using {@link SignalServiceMessageReceiver#retrieveAttachment(SignalServiceAttachmentPointer, java.io.File, int)}
  *
  * @author Moxie Marlinspike
  */
@@ -23,20 +23,25 @@ public class SignalServiceAttachmentPointer extends SignalServiceAttachment {
   private final Optional<String>  relay;
   private final Optional<Integer> size;
   private final Optional<byte[]>  preview;
+  private final Optional<byte[]>  digest;
+  private final Optional<String>  fileName;
 
-  public SignalServiceAttachmentPointer(long id, String contentType, byte[] key, String relay) {
-    this(id, contentType, key, relay, Optional.<Integer>absent(), Optional.<byte[]>absent());
+  public SignalServiceAttachmentPointer(long id, String contentType, byte[] key, String relay, Optional<byte[]> digest, Optional<String> fileName) {
+    this(id, contentType, key, relay, Optional.<Integer>absent(), Optional.<byte[]>absent(), digest, fileName);
   }
 
   public SignalServiceAttachmentPointer(long id, String contentType, byte[] key, String relay,
-                                        Optional<Integer> size, Optional<byte[]> preview)
+                                        Optional<Integer> size, Optional<byte[]> preview,
+                                        Optional<byte[]> digest, Optional<String> fileName)
   {
     super(contentType);
-    this.id      = id;
-    this.key     = key;
-    this.relay   = Optional.fromNullable(relay);
-    this.size    = size;
-    this.preview = preview;
+    this.id       = id;
+    this.key      = key;
+    this.relay    = Optional.fromNullable(relay);
+    this.size     = size;
+    this.preview  = preview;
+    this.digest   = digest;
+    this.fileName = fileName;
   }
 
   public long getId() {
@@ -65,7 +70,15 @@ public class SignalServiceAttachmentPointer extends SignalServiceAttachment {
     return size;
   }
 
+  public Optional<String> getFileName() {
+    return fileName;
+  }
+
   public Optional<byte[]> getPreview() {
     return preview;
+  }
+
+  public Optional<byte[]> getDigest() {
+    return digest;
   }
 }

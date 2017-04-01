@@ -173,7 +173,9 @@ public class SignalServiceCipher {
                                                          pointer.getKey().toByteArray(),
                                                          envelope.getRelay(),
                                                          pointer.hasSize() ? Optional.of(pointer.getSize()) : Optional.<Integer>absent(),
-                                                         pointer.hasThumbnail() ? Optional.of(pointer.getThumbnail().toByteArray()): Optional.<byte[]>absent()));
+                                                         pointer.hasThumbnail() ? Optional.of(pointer.getThumbnail().toByteArray()): Optional.<byte[]>absent(),
+                                                         pointer.hasDigest() ? Optional.of(pointer.getDigest().toByteArray()) : Optional.<byte[]>absent(),
+                                                         pointer.hasFileName() ? Optional.of(pointer.getFileName()) : Optional.<String>absent()));
     }
 
     return new SignalServiceDataMessage(envelope.getTimestamp(), groupInfo, attachments,
@@ -209,7 +211,9 @@ public class SignalServiceCipher {
       return SignalServiceSyncMessage.forContacts(new SignalServiceAttachmentPointer(pointer.getId(),
           pointer.getContentType(), pointer.getKey().toByteArray(), envelope.getRelay(),
           pointer.hasSize() ? Optional.of(pointer.getSize()) : Optional.<Integer>absent(),
-          pointer.hasThumbnail() ? Optional.of(pointer.getThumbnail().toByteArray()): Optional.<byte[]>absent()));
+          pointer.hasThumbnail() ? Optional.of(pointer.getThumbnail().toByteArray()): Optional.<byte[]>absent(),
+          pointer.hasDigest() ? Optional.of(pointer.getDigest().toByteArray()) : Optional.<byte[]>absent(),
+          pointer.hasFileName() ? Optional.of(pointer.getFileName()) : Optional.<String>absent()));
     }
 
     if(content.hasGroups()) {
@@ -217,7 +221,9 @@ public class SignalServiceCipher {
       return SignalServiceSyncMessage.forGroups(new SignalServiceAttachmentPointer(pointer.getId(),
           pointer.getContentType(), pointer.getKey().toByteArray(), envelope.getRelay(),
           pointer.hasSize() ? Optional.of(pointer.getSize()) : Optional.<Integer>absent(),
-          pointer.hasThumbnail() ? Optional.of(pointer.getThumbnail().toByteArray()): Optional.<byte[]>absent()));
+          pointer.hasThumbnail() ? Optional.of(pointer.getThumbnail().toByteArray()): Optional.<byte[]>absent(),
+          pointer.hasDigest() ? Optional.of(pointer.getDigest().toByteArray()) : Optional.<byte[]>absent(),
+          pointer.hasFileName() ? Optional.of(pointer.getFileName()) : Optional.<String>absent()));
     }
     
     if(content.hasBlocked()) {
@@ -282,10 +288,14 @@ public class SignalServiceCipher {
       }
 
       if (content.getGroup().hasAvatar()) {
-        avatar = new SignalServiceAttachmentPointer(content.getGroup().getAvatar().getId(),
-                                                    content.getGroup().getAvatar().getContentType(),
-                                                    content.getGroup().getAvatar().getKey().toByteArray(),
-                                                    envelope.getRelay());
+        AttachmentPointer pointer = content.getGroup().getAvatar();
+
+        avatar = new SignalServiceAttachmentPointer(pointer.getId(),
+                                                    pointer.getContentType(),
+                                                    pointer.getKey().toByteArray(),
+                                                    envelope.getRelay(),
+                                                    pointer.hasDigest() ? Optional.of(pointer.getDigest().toByteArray()) : Optional.<byte[]>absent(),
+                                                    Optional.<String>absent());
       }
 
       return new SignalServiceGroup(type, content.getGroup().getId().toByteArray(), name, members, avatar);
