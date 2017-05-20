@@ -35,11 +35,7 @@ import org.whispersystems.signalservice.api.messages.calls.HangupMessage;
 import org.whispersystems.signalservice.api.messages.calls.IceUpdateMessage;
 import org.whispersystems.signalservice.api.messages.calls.OfferMessage;
 import org.whispersystems.signalservice.api.messages.calls.SignalServiceCallMessage;
-import org.whispersystems.signalservice.api.messages.multidevice.BlockedListMessage;
-import org.whispersystems.signalservice.api.messages.multidevice.ReadMessage;
-import org.whispersystems.signalservice.api.messages.multidevice.RequestMessage;
-import org.whispersystems.signalservice.api.messages.multidevice.SentTranscriptMessage;
-import org.whispersystems.signalservice.api.messages.multidevice.SignalServiceSyncMessage;
+import org.whispersystems.signalservice.api.messages.multidevice.*;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.internal.push.OutgoingPushMessage;
 import org.whispersystems.signalservice.internal.push.PushTransportDetails;
@@ -68,7 +64,7 @@ public class SignalServiceCipher {
 
   private static final String TAG = SignalServiceCipher.class.getSimpleName();
 
-  private final SignalProtocolStore      signalProtocolStore;
+  private final SignalProtocolStore  signalProtocolStore;
   private final SignalServiceAddress localAddress;
 
   public SignalServiceCipher(SignalServiceAddress localAddress, SignalProtocolStore signalProtocolStore) {
@@ -175,7 +171,8 @@ public class SignalServiceCipher {
                                                          pointer.hasSize() ? Optional.of(pointer.getSize()) : Optional.<Integer>absent(),
                                                          pointer.hasThumbnail() ? Optional.of(pointer.getThumbnail().toByteArray()): Optional.<byte[]>absent(),
                                                          pointer.hasDigest() ? Optional.of(pointer.getDigest().toByteArray()) : Optional.<byte[]>absent(),
-                                                         pointer.hasFileName() ? Optional.of(pointer.getFileName()) : Optional.<String>absent()));
+                                                         pointer.hasFileName() ? Optional.of(pointer.getFileName()) : Optional.<String>absent(),
+                                                         (pointer.getFlags() & AttachmentPointer.Flags.VOICE_MESSAGE_VALUE) != 0));
     }
 
     return new SignalServiceDataMessage(envelope.getTimestamp(), groupInfo, attachments,
@@ -208,12 +205,13 @@ public class SignalServiceCipher {
     
     if(content.hasContacts()) {
       AttachmentPointer pointer = content.getContacts().getBlob();
-      return SignalServiceSyncMessage.forContacts(new SignalServiceAttachmentPointer(pointer.getId(),
+      return SignalServiceSyncMessage.forContacts(new ContactsMessage(new SignalServiceAttachmentPointer(pointer.getId(),
           pointer.getContentType(), pointer.getKey().toByteArray(), envelope.getRelay(),
           pointer.hasSize() ? Optional.of(pointer.getSize()) : Optional.<Integer>absent(),
           pointer.hasThumbnail() ? Optional.of(pointer.getThumbnail().toByteArray()): Optional.<byte[]>absent(),
           pointer.hasDigest() ? Optional.of(pointer.getDigest().toByteArray()) : Optional.<byte[]>absent(),
-          pointer.hasFileName() ? Optional.of(pointer.getFileName()) : Optional.<String>absent()));
+          pointer.hasFileName() ? Optional.of(pointer.getFileName()) : Optional.<String>absent(),
+          (pointer.getFlags() & AttachmentPointer.Flags.VOICE_MESSAGE_VALUE) != 0), false));
     }
 
     if(content.hasGroups()) {
@@ -223,9 +221,10 @@ public class SignalServiceCipher {
           pointer.hasSize() ? Optional.of(pointer.getSize()) : Optional.<Integer>absent(),
           pointer.hasThumbnail() ? Optional.of(pointer.getThumbnail().toByteArray()): Optional.<byte[]>absent(),
           pointer.hasDigest() ? Optional.of(pointer.getDigest().toByteArray()) : Optional.<byte[]>absent(),
-          pointer.hasFileName() ? Optional.of(pointer.getFileName()) : Optional.<String>absent()));
+          pointer.hasFileName() ? Optional.of(pointer.getFileName()) : Optional.<String>absent(),
+          (pointer.getFlags() & AttachmentPointer.Flags.VOICE_MESSAGE_VALUE) != 0));
     }
-    
+
     if(content.hasBlocked()) {
       Blocked blocked = content.getBlocked();
       BlockedListMessage message = new BlockedListMessage(blocked.getNumbersList());
@@ -295,7 +294,8 @@ public class SignalServiceCipher {
                                                     pointer.getKey().toByteArray(),
                                                     envelope.getRelay(),
                                                     pointer.hasDigest() ? Optional.of(pointer.getDigest().toByteArray()) : Optional.<byte[]>absent(),
-                                                    Optional.<String>absent());
+                                                    Optional.<String>absent(),
+                                                    false);
       }
 
       return new SignalServiceGroup(type, content.getGroup().getId().toByteArray(), name, members, avatar);
