@@ -6,9 +6,9 @@
 
 package org.whispersystems.signalservice.api.crypto;
 
-import static org.whispersystems.signalservice.internal.push.SignalServiceProtos.GroupContext.Type.DELIVER;
-
+import com.google.protobuf.InvalidProtocolBufferException;
 import org.whispersystems.libsignal.DuplicateMessageException;
+import org.whispersystems.libsignal.IdentityKey;
 import org.whispersystems.libsignal.InvalidKeyException;
 import org.whispersystems.libsignal.InvalidKeyIdException;
 import org.whispersystems.libsignal.InvalidMessageException;
@@ -35,7 +35,14 @@ import org.whispersystems.signalservice.api.messages.calls.HangupMessage;
 import org.whispersystems.signalservice.api.messages.calls.IceUpdateMessage;
 import org.whispersystems.signalservice.api.messages.calls.OfferMessage;
 import org.whispersystems.signalservice.api.messages.calls.SignalServiceCallMessage;
-import org.whispersystems.signalservice.api.messages.multidevice.*;
+import org.whispersystems.signalservice.api.messages.multidevice.BlockedListMessage;
+import org.whispersystems.signalservice.api.messages.multidevice.ContactsMessage;
+import org.whispersystems.signalservice.api.messages.multidevice.ReadMessage;
+import org.whispersystems.signalservice.api.messages.multidevice.RequestMessage;
+import org.whispersystems.signalservice.api.messages.multidevice.SentTranscriptMessage;
+import org.whispersystems.signalservice.api.messages.multidevice.SignalServiceSyncMessage;
+import org.whispersystems.signalservice.api.messages.multidevice.VerifiedMessage;
+import org.whispersystems.signalservice.api.messages.multidevice.VerifiedMessage.VerifiedState;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.internal.push.OutgoingPushMessage;
 import org.whispersystems.signalservice.internal.push.PushTransportDetails;
@@ -46,8 +53,6 @@ import org.whispersystems.signalservice.internal.push.SignalServiceProtos.Envelo
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos.SyncMessage;
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos.SyncMessage.Blocked;
 import org.whispersystems.signalservice.internal.util.Base64;
-
-import com.google.protobuf.InvalidProtocolBufferException;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -182,7 +187,7 @@ public class SignalServiceCipher {
                                         expirationUpdate);
   }
 
-  private SignalServiceSyncMessage createSynchronizeMessage(SignalServiceEnvelope envelope, SyncMessage content) {
+  private SignalServiceSyncMessage createSynchronizeMessage(SignalServiceEnvelope envelope, SyncMessage content) throws InvalidMessageException {
     if (content.hasSent()) {
       SyncMessage.Sent sentContent = content.getSent();
       return SignalServiceSyncMessage.forSentTranscript(new SentTranscriptMessage(sentContent.getDestination(),
@@ -231,6 +236,35 @@ public class SignalServiceCipher {
       Blocked blocked = content.getBlocked();
       BlockedListMessage message = new BlockedListMessage(blocked.getNumbersList());
       return SignalServiceSyncMessage.forBlocked(message);
+    }
+
+    if (content.getVerifiedList().size() > 0) {
+      try {
+        List<VerifiedMessage> verifiedMessages = new LinkedList<>();
+
+        for (SyncMessage.Verified verified : content.getVerifiedList()) {
+          String        destination = verified.getDestination();
+          IdentityKey   identityKey = new IdentityKey(verified.getIdentityKey().toByteArray(), 0);
+
+          VerifiedState verifiedState;
+
+          if (verified.getState() == SyncMessage.Verified.State.DEFAULT) {
+            verifiedState = VerifiedState.DEFAULT;
+          } else if (verified.getState() == SyncMessage.Verified.State.VERIFIED) {
+            verifiedState = VerifiedState.VERIFIED;
+          } else if (verified.getState() == SyncMessage.Verified.State.UNVERIFIED) {
+            verifiedState = VerifiedState.UNVERIFIED;
+          } else {
+            throw new InvalidMessageException("Unknown state: " + verified.getState().getNumber());
+          }
+
+          verifiedMessages.add(new VerifiedMessage(destination, identityKey, verifiedState));
+        }
+
+        return SignalServiceSyncMessage.forVerified(verifiedMessages);
+      } catch (InvalidKeyException e) {
+        throw new InvalidMessageException(e);
+      }
     }
 
     return SignalServiceSyncMessage.empty();

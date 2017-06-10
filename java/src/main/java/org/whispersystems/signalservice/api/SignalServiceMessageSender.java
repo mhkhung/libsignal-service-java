@@ -5,9 +5,8 @@
  */
 package org.whispersystems.signalservice.api;
 
-import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.InvalidProtocolBufferException;
 
 import org.whispersystems.libsignal.InvalidKeyException;
 import org.whispersystems.libsignal.SessionBuilder;
@@ -31,6 +30,7 @@ import org.whispersystems.signalservice.api.messages.multidevice.BlockedListMess
 import org.whispersystems.signalservice.api.messages.multidevice.ReadMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.RequestMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.SignalServiceSyncMessage;
+import org.whispersystems.signalservice.api.messages.multidevice.VerifiedMessage;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.api.push.exceptions.EncapsulatedExceptions;
 import org.whispersystems.signalservice.api.push.exceptions.NetworkFailureException;
@@ -57,8 +57,10 @@ import org.whispersystems.signalservice.internal.push.exceptions.StaleDevicesExc
 import org.whispersystems.signalservice.internal.util.StaticCredentialsProvider;
 import org.whispersystems.signalservice.internal.util.Util;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
+import java.io.IOException;
+import java.security.SecureRandom;
+import java.util.LinkedList;
+import java.util.List;
 
 /**
  * The main interface for sending Signal Service messages.
@@ -219,6 +221,8 @@ public class SignalServiceMessageSender {
       content = createMultiDeviceReadContent(message.getRead().get());
     } else if (message.getBlockedList().isPresent()) {
       content = createMultiDeviceBlockedContent(message.getBlockedList().get());
+    } else if (message.getVerified().isPresent()) {
+      content = createMultiDeviceVerifiedContent(message.getVerified().get());
     } else if (message.getRequest().isPresent()) {
       content = createRequestContent(message.getRequest().get());
     } else {
@@ -303,7 +307,7 @@ public class SignalServiceMessageSender {
 
   private byte[] createMultiDeviceContactsContent(SignalServiceAttachmentStream contacts, boolean complete) throws IOException {
     Content.Builder     container = Content.newBuilder();
-    SyncMessage.Builder builder   = SyncMessage.newBuilder();
+    SyncMessage.Builder builder   = createSyncMessageBuilder();
     builder.setContacts(SyncMessage.Contacts.newBuilder()
                                             .setBlob(createAttachmentPointer(contacts))
                                             .setComplete(complete));
@@ -313,7 +317,7 @@ public class SignalServiceMessageSender {
 
   private byte[] createMultiDeviceGroupsContent(SignalServiceAttachmentStream groups) throws IOException {
     Content.Builder     container = Content.newBuilder();
-    SyncMessage.Builder builder   = SyncMessage.newBuilder();
+    SyncMessage.Builder builder   = createSyncMessageBuilder();
     builder.setGroups(SyncMessage.Groups.newBuilder()
                                         .setBlob(createAttachmentPointer(groups)));
 
@@ -324,7 +328,7 @@ public class SignalServiceMessageSender {
   {
     try {
       Content.Builder          container   = Content.newBuilder();
-      SyncMessage.Builder      syncMessage = SyncMessage.newBuilder();
+      SyncMessage.Builder      syncMessage = createSyncMessageBuilder();
       SyncMessage.Sent.Builder sentMessage = SyncMessage.Sent.newBuilder();
       DataMessage              dataMessage = DataMessage.parseFrom(content);
 
@@ -348,7 +352,7 @@ public class SignalServiceMessageSender {
 
   private byte[] createMultiDeviceReadContent(List<ReadMessage> readMessages) {
     Content.Builder     container = Content.newBuilder();
-    SyncMessage.Builder builder   = SyncMessage.newBuilder();
+    SyncMessage.Builder builder   = createSyncMessageBuilder();
 
     for (ReadMessage readMessage : readMessages) {
       builder.addRead(SyncMessage.Read.newBuilder()
@@ -370,12 +374,46 @@ public class SignalServiceMessageSender {
 
   private byte[] createMultiDeviceBlockedContent(BlockedListMessage blocked) {
     Content.Builder             container      = Content.newBuilder();
-    SyncMessage.Builder         syncMessage    = SyncMessage.newBuilder();
+    SyncMessage.Builder         syncMessage    = createSyncMessageBuilder();
     SyncMessage.Blocked.Builder blockedMessage = SyncMessage.Blocked.newBuilder();
 
     blockedMessage.addAllNumbers(blocked.getNumbers());
 
     return container.setSyncMessage(syncMessage.setBlocked(blockedMessage)).build().toByteArray();
+  }
+
+  private byte[] createMultiDeviceVerifiedContent(List<VerifiedMessage> verifiedMessages) {
+    Content.Builder              container       = Content.newBuilder();
+    SyncMessage.Builder          syncMessage     = createSyncMessageBuilder();
+
+    for (VerifiedMessage verifiedMessage : verifiedMessages) {
+      SyncMessage.Verified.Builder verifiedMessageBuilder = SyncMessage.Verified.newBuilder();
+
+      verifiedMessageBuilder.setDestination(verifiedMessage.getDestination());
+      verifiedMessageBuilder.setIdentityKey(ByteString.copyFrom(verifiedMessage.getIdentityKey().serialize()));
+
+      switch(verifiedMessage.getVerified()) {
+        case DEFAULT:    verifiedMessageBuilder.setState(SyncMessage.Verified.State.DEFAULT);    break;
+        case VERIFIED:   verifiedMessageBuilder.setState(SyncMessage.Verified.State.VERIFIED);   break;
+        case UNVERIFIED: verifiedMessageBuilder.setState(SyncMessage.Verified.State.UNVERIFIED); break;
+        default:         throw new AssertionError("Unknown: " + verifiedMessage.getVerified());
+      }
+
+      syncMessage.addVerified(verifiedMessageBuilder);
+    }
+
+    return container.setSyncMessage(syncMessage).build().toByteArray();
+  }
+
+  private SyncMessage.Builder createSyncMessageBuilder() {
+    SecureRandom random  = new SecureRandom();
+    byte[]       padding = new byte[random.nextInt(512)];
+    random.nextBytes(padding);
+
+    SyncMessage.Builder builder = SyncMessage.newBuilder();
+    builder.setPadding(ByteString.copyFrom(padding));
+
+    return builder;
   }
 
   private GroupContext createGroupContent(SignalServiceGroup group) throws IOException {
