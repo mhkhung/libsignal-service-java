@@ -70,8 +70,9 @@ message CallMessage {
 
 message DataMessage {
   enum Flags {
-    END_SESSION = 1;
+    END_SESSION             = 1;
     EXPIRATION_TIMER_UPDATE = 2;
+    PROFILE_KEY_UPDATE      = 4;
   }
 
   optional string             body        = 1;
@@ -79,6 +80,7 @@ message DataMessage {
   optional GroupContext       group       = 3;
   optional uint32             flags       = 4;
   optional uint32             expireTimer = 5;
+  optional bytes              profileKey  = 6;
 }
 
 message NullMessage {
@@ -181,11 +183,12 @@ message ContactDetails {
     optional uint32 length      = 2;
   }
 
-  optional string   number   = 1;
-  optional string   name     = 2;
-  optional Avatar   avatar   = 3;
-  optional string   color    = 4;
-  optional Verified verified = 5;
+  optional string   number     = 1;
+  optional string   name       = 2;
+  optional Avatar   avatar     = 3;
+  optional string   color      = 4;
+  optional Verified verified   = 5;
+  optional bytes    profileKey = 6;
 }
 
 message GroupDetails {

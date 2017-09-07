@@ -46,7 +46,6 @@ import org.whispersystems.signalservice.api.messages.multidevice.VerifiedMessage
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.internal.push.OutgoingPushMessage;
 import org.whispersystems.signalservice.internal.push.PushTransportDetails;
-import org.whispersystems.signalservice.internal.push.SignalServiceProtos;
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos.AttachmentPointer;
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos.Content;
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos.DataMessage;
@@ -170,6 +169,7 @@ public class SignalServiceCipher {
     List<SignalServiceAttachment> attachments      = new LinkedList<>();
     boolean                       endSession       = ((content.getFlags() & DataMessage.Flags.END_SESSION_VALUE) != 0);
     boolean                       expirationUpdate = ((content.getFlags() & DataMessage.Flags.EXPIRATION_TIMER_UPDATE_VALUE) != 0);
+    boolean                       profileKeyUpdate = ((content.getFlags() & DataMessage.Flags.PROFILE_KEY_UPDATE_VALUE) != 0);
 
     for (AttachmentPointer pointer : content.getAttachmentsList()) {
       attachments.add(new SignalServiceAttachmentPointer(pointer.getId(),
@@ -185,7 +185,8 @@ public class SignalServiceCipher {
 
     return new SignalServiceDataMessage(envelope.getTimestamp(), groupInfo, attachments,
                                         content.getBody(), endSession, content.getExpireTimer(),
-                                        expirationUpdate);
+                                        expirationUpdate, content.hasProfileKey() ? content.getProfileKey().toByteArray() : null,
+                                        profileKeyUpdate);
   }
 
   private SignalServiceSyncMessage createSynchronizeMessage(SignalServiceEnvelope envelope, SyncMessage content) throws InvalidMessageException {

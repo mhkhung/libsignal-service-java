@@ -7,15 +7,7 @@
 package org.whispersystems.signalservice.api;
 
 
-import java.io.IOException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeoutException;
+import com.google.protobuf.ByteString;
 
 import org.whispersystems.libsignal.IdentityKey;
 import org.whispersystems.libsignal.IdentityKeyPair;
@@ -27,22 +19,37 @@ import org.whispersystems.libsignal.state.PreKeyRecord;
 import org.whispersystems.libsignal.state.SignedPreKeyRecord;
 import org.whispersystems.libsignal.util.ByteUtil;
 import org.whispersystems.libsignal.util.guava.Optional;
+import org.whispersystems.signalservice.api.crypto.ProfileCipher;
+import org.whispersystems.signalservice.api.crypto.ProfileCipherInputStream;
 import org.whispersystems.signalservice.api.messages.calls.TurnServerInfo;
 import org.whispersystems.signalservice.api.messages.multidevice.DeviceInfo;
 import org.whispersystems.signalservice.api.push.ContactTokenDetails;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.api.push.SignedPreKeyEntity;
-import org.whispersystems.signalservice.api.push.TrustStore;
+import org.whispersystems.signalservice.api.util.StreamDetails;
+import org.whispersystems.signalservice.internal.configuration.SignalServiceConfiguration;
 import org.whispersystems.signalservice.internal.crypto.ProvisioningCipher;
-import org.whispersystems.signalservice.internal.push.ProvisioningProtos.ProvisionMessage;
+import org.whispersystems.signalservice.internal.push.ProfileAvatarData;
 import org.whispersystems.signalservice.internal.push.ProvisioningSocket;
 import org.whispersystems.signalservice.internal.push.PushServiceSocket;
-import org.whispersystems.signalservice.internal.push.SignalServiceUrl;
+import org.whispersystems.signalservice.internal.configuration.SignalServiceUrl;
+import org.whispersystems.signalservice.internal.push.http.ProfileCipherOutputStreamFactory;
 import org.whispersystems.signalservice.internal.util.Base64;
 import org.whispersystems.signalservice.internal.util.DynamicCredentialsProvider;
 import org.whispersystems.signalservice.internal.util.Util;
 
-import com.google.protobuf.ByteString;
+import java.io.IOException;
+import java.io.InputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.concurrent.TimeoutException;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import static org.whispersystems.signalservice.internal.push.ProvisioningProtos.ProvisionMessage;
 
 /**
  * The main interface for creating, registering, and
@@ -59,34 +66,34 @@ public class SignalServiceAccountManager {
   /**
    * Construct a SignalServiceAccountManager.
    *
-   * @param urls The URL for the Signal Service.
+   * @param configuration The URL for the Signal Service.
    * @param user A Signal Service phone number.
    * @param password A Signal Service password.
    * @param deviceId A integer which is provided by the server while linking.
    * @param userAgent A string which identifies the client software.
    */
-  public SignalServiceAccountManager(SignalServiceUrl[] urls,
+  public SignalServiceAccountManager(SignalServiceConfiguration configuration,
                                      String user, String password, int deviceId,
                                      String userAgent)
   {
     this.credentialsProvider = new DynamicCredentialsProvider(user, password, null, deviceId);
-    this.provisioningSocket  = new ProvisioningSocket(urls, userAgent);
-    this.pushServiceSocket   = new PushServiceSocket(urls, credentialsProvider, userAgent);
+    this.provisioningSocket  = new ProvisioningSocket(configuration, userAgent);
+    this.pushServiceSocket   = new PushServiceSocket(configuration, credentialsProvider, userAgent);
   }
   
   /**
    * Construct a SignalServiceAccountManager.
    *
-   * @param urls The URL for the Signal Service.
+   * @param configuration The URL for the Signal Service.
    * @param user A Signal Service phone number.
    * @param password A Signal Service password.
    * @param userAgent A string which identifies the client software.
    */
-  public SignalServiceAccountManager(SignalServiceUrl[] urls,
+  public SignalServiceAccountManager(SignalServiceConfiguration configuration,
                                      String user, String password,
                                      String userAgent)
   {
-    this(urls, user, password, SignalServiceAddress.DEFAULT_DEVICE_ID, userAgent);
+    this(configuration, user, password, SignalServiceAddress.DEFAULT_DEVICE_ID, userAgent);
   }
 
   /**
@@ -305,18 +312,22 @@ public class SignalServiceAccountManager {
   public void addDevice(String deviceIdentifier,
                         ECPublicKey deviceKey,
                         IdentityKeyPair identityKeyPair,
+                        Optional<byte[]> profileKey,
                         String code)
       throws InvalidKeyException, IOException
   {
     ProvisioningCipher cipher  = new ProvisioningCipher(deviceKey);
-    ProvisionMessage   message = ProvisionMessage.newBuilder()
-                                                 .setIdentityKeyPublic(ByteString.copyFrom(identityKeyPair.getPublicKey().serialize()))
-                                                 .setIdentityKeyPrivate(ByteString.copyFrom(identityKeyPair.getPrivateKey().serialize()))
-                                                 .setNumber(credentialsProvider.getUser())
-                                                 .setProvisioningCode(code)
-                                                 .build();
+    ProvisionMessage.Builder message = ProvisionMessage.newBuilder()
+                                                       .setIdentityKeyPublic(ByteString.copyFrom(identityKeyPair.getPublicKey().serialize()))
+                                                       .setIdentityKeyPrivate(ByteString.copyFrom(identityKeyPair.getPrivateKey().serialize()))
+                                                       .setNumber(credentialsProvider.getUser())
+                                                       .setProvisioningCode(code);
 
-    byte[] ciphertext = cipher.encrypt(message);
+    if (profileKey.isPresent()) {
+      message.setProfileKey(ByteString.copyFrom(profileKey.get()));
+    }
+
+    byte[] ciphertext = cipher.encrypt(message.build());
     this.pushServiceSocket.sendProvisioningMessage(deviceIdentifier, ciphertext);
   }
 
@@ -330,6 +341,32 @@ public class SignalServiceAccountManager {
 
   public TurnServerInfo getTurnServerInfo() throws IOException {
     return this.pushServiceSocket.getTurnServerInfo();
+  }
+
+  public void setProfileName(byte[] key, String name)
+      throws IOException
+  {
+    String ciphertextName = null;
+
+    if (name != null) {
+      ciphertextName = Base64.encodeBytesWithoutPadding(new ProfileCipher(key).encryptName(name.getBytes("UTF-8"), ProfileCipher.NAME_PADDED_LENGTH));
+    }
+
+    this.pushServiceSocket.setProfileName(ciphertextName);
+
+  }
+
+  public void setProfileAvatar(byte[] key, StreamDetails avatar)
+      throws IOException
+  {
+    ProfileAvatarData profileAvatarData = null;
+
+    if (avatar != null) {
+      profileAvatarData = new ProfileAvatarData(avatar.getStream(), avatar.getLength(), avatar.getContentType(),
+                                                new ProfileCipherOutputStreamFactory(key));
+    }
+
+    this.pushServiceSocket.setProfileAvatar(profileAvatarData);
   }
 
   public void setSoTimeoutMillis(long soTimeoutMillis) {
