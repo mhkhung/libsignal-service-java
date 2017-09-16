@@ -26,6 +26,7 @@ import org.whispersystems.signalservice.api.messages.multidevice.DeviceInfo;
 import org.whispersystems.signalservice.api.push.ContactTokenDetails;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.api.push.SignedPreKeyEntity;
+import org.whispersystems.signalservice.api.util.CredentialsProvider;
 import org.whispersystems.signalservice.api.util.StreamDetails;
 import org.whispersystems.signalservice.internal.configuration.SignalServiceConfiguration;
 import org.whispersystems.signalservice.internal.crypto.ProvisioningCipher;
@@ -76,9 +77,7 @@ public class SignalServiceAccountManager {
                                      String user, String password, int deviceId,
                                      String userAgent)
   {
-    this.credentialsProvider = new DynamicCredentialsProvider(user, password, null, deviceId);
-    this.provisioningSocket  = new ProvisioningSocket(configuration, userAgent);
-    this.pushServiceSocket   = new PushServiceSocket(configuration, credentialsProvider, userAgent);
+    this(configuration, new DynamicCredentialsProvider(user, password, null, deviceId), userAgent);
   }
   
   /**
@@ -94,6 +93,15 @@ public class SignalServiceAccountManager {
                                      String userAgent)
   {
     this(configuration, user, password, SignalServiceAddress.DEFAULT_DEVICE_ID, userAgent);
+  }
+
+  public SignalServiceAccountManager(SignalServiceConfiguration configuration,
+                                     DynamicCredentialsProvider credentialsProvider,
+                                     String userAgent)
+  {
+    this.credentialsProvider = credentialsProvider;
+    this.provisioningSocket  = new ProvisioningSocket(configuration, userAgent);
+    this.pushServiceSocket   = new PushServiceSocket(configuration, credentialsProvider, userAgent);
   }
 
   /**
