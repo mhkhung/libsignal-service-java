@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (C) 2014-2016 Open Whisper Systems
  *
  * Licensed according to the LICENSE file in this repository.
@@ -16,6 +16,7 @@ import org.whispersystems.libsignal.state.PreKeyBundle;
 import org.whispersystems.libsignal.state.SignalProtocolStore;
 import org.whispersystems.libsignal.util.Pair;
 import org.whispersystems.libsignal.util.guava.Optional;
+import org.whispersystems.signalservice.api.crypto.AttachmentCipherOutputStream;
 import org.whispersystems.signalservice.api.crypto.SignalServiceCipher;
 import org.whispersystems.signalservice.api.crypto.UntrustedIdentityException;
 import org.whispersystems.signalservice.api.messages.SignalServiceAttachment;
@@ -40,6 +41,7 @@ import org.whispersystems.signalservice.api.push.exceptions.PushNetworkException
 import org.whispersystems.signalservice.api.push.exceptions.UnregisteredUserException;
 import org.whispersystems.signalservice.api.util.CredentialsProvider;
 import org.whispersystems.signalservice.internal.configuration.SignalServiceConfiguration;
+import org.whispersystems.signalservice.internal.crypto.PaddingInputStream;
 import org.whispersystems.signalservice.internal.push.MismatchedDevices;
 import org.whispersystems.signalservice.internal.push.OutgoingPushMessage;
 import org.whispersystems.signalservice.internal.push.OutgoingPushMessageList;
@@ -68,6 +70,7 @@ import java.io.IOException;
 import java.security.SecureRandom;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The main interface for sending Signal Service messages.
@@ -78,11 +81,11 @@ public class SignalServiceMessageSender {
 
   private static final String TAG = SignalServiceMessageSender.class.getSimpleName();
 
-  private final PushServiceSocket                  socket;
-  private final SignalProtocolStore                store;
-  private final SignalServiceAddress               localAddress;
-  private final Optional<SignalServiceMessagePipe> pipe;
-  private final Optional<EventListener>            eventListener;
+  private final PushServiceSocket                                   socket;
+  private final SignalProtocolStore                                 store;
+  private final SignalServiceAddress                                localAddress;
+  private final AtomicReference<Optional<SignalServiceMessagePipe>> pipe;
+  private final Optional<EventListener>                             eventListener;
   private final CredentialsProvider                credentialsProvider;
 
   /**
@@ -137,7 +140,7 @@ public class SignalServiceMessageSender {
     this.socket        = new PushServiceSocket(urls, credentialsProvider, userAgent);
     this.store         = store;
     this.localAddress  = new SignalServiceAddress(credentialsProvider.getUser());
-    this.pipe          = pipe;
+    this.pipe          = new AtomicReference<>(pipe);
     this.eventListener = eventListener;
   }
 
@@ -265,6 +268,10 @@ public class SignalServiceMessageSender {
     socket.cancelInFlightRequests();
   }
 
+  public void setMessagePipe(SignalServiceMessagePipe pipe) {
+    this.pipe.set(Optional.fromNullable(pipe));
+  }
+
   private void sendMessage(VerifiedMessage message) throws IOException, UntrustedIdentityException {
     byte[] nullMessageBody = DataMessage.newBuilder()
                                         .setBody(Base64.encodeBytes(Util.getRandomLengthBytes(140)))
@@ -338,6 +345,8 @@ public class SignalServiceMessageSender {
     if (message.getProfileKey().isPresent()) {
       builder.setProfileKey(ByteString.copyFrom(message.getProfileKey().get()));
     }
+
+    builder.setTimestamp(message.getTimestamp());
 
     return container.setDataMessage(builder).build().toByteArray();
   }
@@ -549,7 +558,8 @@ public class SignalServiceMessageSender {
   {
     for (int i=0;i<3;i++) {
       try {
-        OutgoingPushMessageList messages = getEncryptedMessages(socket, recipient, timestamp, content, silent);
+        OutgoingPushMessageList            messages = getEncryptedMessages(socket, recipient, timestamp, content, silent);
+        Optional<SignalServiceMessagePipe> pipe     = this.pipe.get();
 
         if (pipe.isPresent()) {
           try {
@@ -596,12 +606,14 @@ public class SignalServiceMessageSender {
   private AttachmentPointer createAttachmentPointer(SignalServiceAttachmentStream attachment)
       throws IOException
   {
-    byte[]             attachmentKey  = Util.getSecretBytes(64);
-    PushAttachmentData attachmentData = new PushAttachmentData(attachment.getContentType(),
-                                                               attachment.getInputStream(),
-                                                               attachment.getLength(),
-                                                               new AttachmentCipherOutputStreamFactory(attachmentKey),
-                                                               attachment.getListener());
+    byte[]             attachmentKey    = Util.getSecretBytes(64);
+    long               paddedLength     = PaddingInputStream.getPaddedSize(attachment.getLength());
+    long               ciphertextLength = AttachmentCipherOutputStream.getCiphertextLength(paddedLength);
+    PushAttachmentData attachmentData   = new PushAttachmentData(attachment.getContentType(),
+                                                                 new PaddingInputStream(attachment.getInputStream(), attachment.getLength()),
+                                                                 ciphertextLength,
+                                                                 new AttachmentCipherOutputStreamFactory(attachmentKey),
+                                                                 attachment.getListener());
 
     Pair<Long, byte[]> attachmentIdAndDigest = socket.sendAttachment(attachmentData);
 

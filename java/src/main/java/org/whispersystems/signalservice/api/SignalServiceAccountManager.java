@@ -21,6 +21,7 @@ import org.whispersystems.libsignal.util.ByteUtil;
 import org.whispersystems.libsignal.util.guava.Optional;
 import org.whispersystems.signalservice.api.crypto.ProfileCipher;
 import org.whispersystems.signalservice.api.crypto.ProfileCipherInputStream;
+import org.whispersystems.signalservice.api.crypto.ProfileCipherOutputStream;
 import org.whispersystems.signalservice.api.messages.calls.TurnServerInfo;
 import org.whispersystems.signalservice.api.messages.multidevice.DeviceInfo;
 import org.whispersystems.signalservice.api.push.ContactTokenDetails;
@@ -29,6 +30,7 @@ import org.whispersystems.signalservice.api.push.SignedPreKeyEntity;
 import org.whispersystems.signalservice.api.util.CredentialsProvider;
 import org.whispersystems.signalservice.api.util.StreamDetails;
 import org.whispersystems.signalservice.internal.configuration.SignalServiceConfiguration;
+import org.whispersystems.signalservice.internal.crypto.PaddingInputStream;
 import org.whispersystems.signalservice.internal.crypto.ProvisioningCipher;
 import org.whispersystems.signalservice.internal.push.ProfileAvatarData;
 import org.whispersystems.signalservice.internal.push.ProvisioningSocket;
@@ -367,7 +369,9 @@ public class SignalServiceAccountManager {
     ProfileAvatarData profileAvatarData = null;
 
     if (avatar != null) {
-      profileAvatarData = new ProfileAvatarData(avatar.getStream(), avatar.getLength(), avatar.getContentType(),
+      profileAvatarData = new ProfileAvatarData(avatar.getStream(),
+                                                ProfileCipherOutputStream.getCiphertextLength(avatar.getLength()),
+                                                avatar.getContentType(),
                                                 new ProfileCipherOutputStreamFactory(key));
     }
 
