@@ -24,7 +24,7 @@ public class ProvisioningSocket {
     // TODO uses first url, like in SignalServiceMessageReceiver
     // TODO should probably make this random, like in PushServiceSocket
     SignalServiceUrl[] serviceUrls = signalServiceConfiguration.getSignalServiceUrls();
-    connection = new WebSocketConnection(serviceUrls[0].getUrl(), serviceUrls[0].getTrustStore(), userAgent);
+    connection = new WebSocketConnection(serviceUrls[0].getUrl(), serviceUrls[0].getTrustStore(), userAgent, null);
   }
   
   public ProvisioningUuid getProvisioningUuid() throws TimeoutException, IOException {
