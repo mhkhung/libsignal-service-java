@@ -20,7 +20,6 @@ import org.whispersystems.libsignal.state.SignedPreKeyRecord;
 import org.whispersystems.libsignal.util.ByteUtil;
 import org.whispersystems.libsignal.util.guava.Optional;
 import org.whispersystems.signalservice.api.crypto.ProfileCipher;
-import org.whispersystems.signalservice.api.crypto.ProfileCipherInputStream;
 import org.whispersystems.signalservice.api.crypto.ProfileCipherOutputStream;
 import org.whispersystems.signalservice.api.messages.calls.TurnServerInfo;
 import org.whispersystems.signalservice.api.messages.multidevice.DeviceInfo;
@@ -30,19 +29,16 @@ import org.whispersystems.signalservice.api.push.SignedPreKeyEntity;
 import org.whispersystems.signalservice.api.util.CredentialsProvider;
 import org.whispersystems.signalservice.api.util.StreamDetails;
 import org.whispersystems.signalservice.internal.configuration.SignalServiceConfiguration;
-import org.whispersystems.signalservice.internal.crypto.PaddingInputStream;
 import org.whispersystems.signalservice.internal.crypto.ProvisioningCipher;
 import org.whispersystems.signalservice.internal.push.ProfileAvatarData;
 import org.whispersystems.signalservice.internal.push.ProvisioningSocket;
 import org.whispersystems.signalservice.internal.push.PushServiceSocket;
-import org.whispersystems.signalservice.internal.configuration.SignalServiceUrl;
 import org.whispersystems.signalservice.internal.push.http.ProfileCipherOutputStreamFactory;
 import org.whispersystems.signalservice.internal.util.Base64;
 import org.whispersystems.signalservice.internal.util.DynamicCredentialsProvider;
 import org.whispersystems.signalservice.internal.util.Util;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.TimeoutException;
@@ -106,6 +102,14 @@ public class SignalServiceAccountManager {
     this.pushServiceSocket   = new PushServiceSocket(configuration, credentialsProvider, userAgent);
   }
 
+  public void setPin(Optional<String> pin) throws IOException {
+    if (pin.isPresent()) {
+      this.pushServiceSocket.setPin(pin.get());
+    } else {
+      this.pushServiceSocket.removePin();
+    }
+  }
+
   /**
    * Register/Unregister a Google Cloud Messaging registration ID.
    *
@@ -155,12 +159,12 @@ public class SignalServiceAccountManager {
    *
    * @throws IOException
    */
-  public void verifyAccountWithCode(String verificationCode, String signalingKey, int signalProtocolRegistrationId, boolean fetchesMessages)
+  public void verifyAccountWithCode(String verificationCode, String signalingKey, int signalProtocolRegistrationId, boolean fetchesMessages, String pin)
       throws IOException
   {
     this.pushServiceSocket.verifyAccountCode(verificationCode, signalingKey,
                                              signalProtocolRegistrationId,
-                                             fetchesMessages);
+                                             fetchesMessages, pin);
   }
 
   /**
@@ -174,10 +178,10 @@ public class SignalServiceAccountManager {
    *
    * @throws IOException
    */
-  public void setAccountAttributes(String signalingKey, int signalProtocolRegistrationId, boolean fetchesMessages)
+  public void setAccountAttributes(String signalingKey, int signalProtocolRegistrationId, boolean fetchesMessages, String pin)
       throws IOException
   {
-    this.pushServiceSocket.setAccountAttributes(signalingKey, signalProtocolRegistrationId, fetchesMessages);
+    this.pushServiceSocket.setAccountAttributes(signalingKey, signalProtocolRegistrationId, fetchesMessages, pin);
   }
 
   /**
@@ -260,10 +264,6 @@ public class SignalServiceAccountManager {
     return activeTokens;
   }
 
-  public String getAccountVerificationToken() throws IOException {
-    return this.pushServiceSocket.getAccountVerificationToken();
-  }
-  
   /**
    * Request a UUID from the server for linking as a new device.
    * Called by the new device.
