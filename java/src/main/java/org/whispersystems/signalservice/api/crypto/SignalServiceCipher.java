@@ -213,7 +213,7 @@ public class SignalServiceCipher {
 
       return SignalServiceSyncMessage.forRead(readMessages);
     }
-    
+
     if(content.hasContacts()) {
       AttachmentPointer pointer = content.getContacts().getBlob();
       return SignalServiceSyncMessage.forContacts(new ContactsMessage(new SignalServiceAttachmentPointer(pointer.getId(),
@@ -224,7 +224,7 @@ public class SignalServiceCipher {
           pointer.hasHeight() ? pointer.getHeight() : 0,
           pointer.hasDigest() ? Optional.of(pointer.getDigest().toByteArray()) : Optional.<byte[]>absent(),
           pointer.hasFileName() ? Optional.of(pointer.getFileName()) : Optional.<String>absent(),
-          (pointer.getFlags() & AttachmentPointer.Flags.VOICE_MESSAGE_VALUE) != 0), false));
+          (pointer.getFlags() & AttachmentPointer.Flags.VOICE_MESSAGE_VALUE) != 0), content.getContacts().hasComplete() && content.getContacts().getComplete()));
     }
 
     if(content.hasGroups()) {
