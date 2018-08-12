@@ -27,6 +27,7 @@ import org.whispersystems.signalservice.api.push.ContactTokenDetails;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.api.push.SignedPreKeyEntity;
 import org.whispersystems.signalservice.api.util.CredentialsProvider;
+import org.whispersystems.signalservice.api.util.SleepTimer;
 import org.whispersystems.signalservice.api.util.StreamDetails;
 import org.whispersystems.signalservice.internal.configuration.SignalServiceConfiguration;
 import org.whispersystems.signalservice.internal.crypto.ProvisioningCipher;
@@ -73,9 +74,9 @@ public class SignalServiceAccountManager {
    */
   public SignalServiceAccountManager(SignalServiceConfiguration configuration,
                                      String user, String password, int deviceId,
-                                     String userAgent)
+                                     String userAgent, SleepTimer timer)
   {
-    this(configuration, new DynamicCredentialsProvider(user, password, null, deviceId), userAgent);
+    this(configuration, new DynamicCredentialsProvider(user, password, null, deviceId), userAgent, timer);
   }
   
   /**
@@ -88,17 +89,17 @@ public class SignalServiceAccountManager {
    */
   public SignalServiceAccountManager(SignalServiceConfiguration configuration,
                                      String user, String password,
-                                     String userAgent)
+                                     String userAgent, SleepTimer timer)
   {
-    this(configuration, user, password, SignalServiceAddress.DEFAULT_DEVICE_ID, userAgent);
+    this(configuration, user, password, SignalServiceAddress.DEFAULT_DEVICE_ID, userAgent, timer);
   }
 
   public SignalServiceAccountManager(SignalServiceConfiguration configuration,
                                      DynamicCredentialsProvider credentialsProvider,
-                                     String userAgent)
+                                     String userAgent, SleepTimer timer)
   {
     this.credentialsProvider = credentialsProvider;
-    this.provisioningSocket  = new ProvisioningSocket(configuration, userAgent);
+    this.provisioningSocket  = new ProvisioningSocket(configuration, userAgent, timer);
     this.pushServiceSocket   = new PushServiceSocket(configuration, credentialsProvider, userAgent);
   }
 
