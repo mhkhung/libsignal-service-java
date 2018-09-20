@@ -6,6 +6,7 @@
 
 package org.whispersystems.signalservice.api.crypto;
 
+import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.whispersystems.libsignal.DuplicateMessageException;
 import org.whispersystems.libsignal.IdentityKey;
@@ -58,6 +59,7 @@ import org.whispersystems.signalservice.internal.push.SignalServiceProtos.SyncMe
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos.Verified;
 import org.whispersystems.signalservice.internal.util.Base64;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -244,7 +246,11 @@ public class SignalServiceCipher {
 
     if(content.hasBlocked()) {
       Blocked blocked = content.getBlocked();
-      BlockedListMessage message = new BlockedListMessage(blocked.getNumbersList());
+      List<byte[]> blockedGroupIds = new ArrayList<>(blocked.getGroupIdsCount());
+      for (ByteString groupId : blocked.getGroupIdsList()) {
+        blockedGroupIds.add(groupId.toByteArray());
+      }
+      BlockedListMessage message = new BlockedListMessage(blocked.getNumbersList(), blockedGroupIds);
       return SignalServiceSyncMessage.forBlocked(message);
     }
 
