@@ -125,6 +125,10 @@ public class SignalServiceAccountManager {
     this.pushServiceSocket   = new PushServiceSocket(configuration, credentialsProvider, userAgent);
   }
 
+  public byte[] getSenderCertificate() throws IOException {
+    return this.pushServiceSocket.getSenderCertificate();
+  }
+
   public void setPin(Optional<String> pin) throws IOException {
     if (pin.isPresent()) {
       this.pushServiceSocket.setPin(pin.get());
@@ -182,12 +186,15 @@ public class SignalServiceAccountManager {
    *
    * @throws IOException
    */
-  public void verifyAccountWithCode(String verificationCode, String signalingKey, int signalProtocolRegistrationId, boolean fetchesMessages, String pin)
+  public void verifyAccountWithCode(String verificationCode, String signalingKey, int signalProtocolRegistrationId, boolean fetchesMessages, String pin,
+                                    byte[] unidentifiedAccessKey, boolean unrestrictedUnidentifiedAccess)
       throws IOException
   {
     this.pushServiceSocket.verifyAccountCode(verificationCode, signalingKey,
                                              signalProtocolRegistrationId,
-                                             fetchesMessages, pin);
+                                             fetchesMessages, pin,
+                                             unidentifiedAccessKey,
+                                             unrestrictedUnidentifiedAccess);
   }
 
   /**
@@ -201,10 +208,12 @@ public class SignalServiceAccountManager {
    *
    * @throws IOException
    */
-  public void setAccountAttributes(String signalingKey, int signalProtocolRegistrationId, boolean fetchesMessages, String pin)
+  public void setAccountAttributes(String signalingKey, int signalProtocolRegistrationId, boolean fetchesMessages, String pin,
+                                   byte[] unidentifiedAccessKey, boolean unrestrictedUnidentifiedAccess)
       throws IOException
   {
-    this.pushServiceSocket.setAccountAttributes(signalingKey, signalProtocolRegistrationId, fetchesMessages, pin);
+    this.pushServiceSocket.setAccountAttributes(signalingKey, signalProtocolRegistrationId, fetchesMessages, pin,
+                                                unidentifiedAccessKey, unrestrictedUnidentifiedAccess);
   }
 
   /**

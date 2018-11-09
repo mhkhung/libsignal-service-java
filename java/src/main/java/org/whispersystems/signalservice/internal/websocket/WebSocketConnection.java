@@ -4,6 +4,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 
 import org.whispersystems.libsignal.logging.Log;
 import org.whispersystems.libsignal.util.Pair;
+import org.whispersystems.libsignal.util.guava.Optional;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.api.push.TrustStore;
 import org.whispersystems.signalservice.api.util.CredentialsProvider;
@@ -49,12 +50,12 @@ public class WebSocketConnection extends WebSocketListener {
   private final LinkedList<WebSocketRequestMessage>              incomingRequests = new LinkedList<>();
   private final Map<Long, SettableFuture<Pair<Integer, String>>> outgoingRequests = new HashMap<>();
 
-  private final String               wsUri;
-  private final TrustStore           trustStore;
-  private final CredentialsProvider  credentialsProvider;
-  private final String               userAgent;
-  private final ConnectivityListener listener;
-  private final SleepTimer           sleepTimer;
+  private final String                        wsUri;
+  private final TrustStore                    trustStore;
+  private final Optional<CredentialsProvider> credentialsProvider;
+  private final String                        userAgent;
+  private final ConnectivityListener          listener;
+  private final SleepTimer                    sleepTimer;
 
   private WebSocket           client;
   private KeepAliveSender     keepAliveSender;
@@ -63,7 +64,7 @@ public class WebSocketConnection extends WebSocketListener {
 
   public WebSocketConnection(String httpUri,
                              TrustStore trustStore,
-                             CredentialsProvider credentialsProvider,
+                             Optional<CredentialsProvider> credentialsProvider,
                              String userAgent,
                              ConnectivityListener listener,
                              SleepTimer timer)
@@ -75,8 +76,11 @@ public class WebSocketConnection extends WebSocketListener {
     this.sleepTimer          = timer;
     this.attempts            = 0;
     this.connected           = false;
-    this.wsUri               = httpUri.replace("https://", "wss://")
-                                      .replace("http://", "ws://") + "/v1/websocket/?login=%s&password=%s";
+
+    String uri = httpUri.replace("https://", "wss://").replace("http://", "ws://");
+
+    if (credentialsProvider.isPresent()) this.wsUri = uri + "/v1/websocket/?login=%s&password=%s";
+    else                                 this.wsUri = uri + "/v1/websocket/";
   }
   
   public WebSocketConnection(String httpUri, TrustStore trustStore, String userAgent, ConnectivityListener listener,
@@ -95,11 +99,11 @@ public class WebSocketConnection extends WebSocketListener {
 
     if (client == null) {
       String filledUri;
-      if (credentialsProvider != null) {
-        if (credentialsProvider.getDeviceId() == SignalServiceAddress.DEFAULT_DEVICE_ID) {
-          filledUri = String.format(wsUri, credentialsProvider.getUser(), credentialsProvider.getPassword());
+      if (credentialsProvider.isPresent()) {
+        if (credentialsProvider.get().getDeviceId() == SignalServiceAddress.DEFAULT_DEVICE_ID) {
+          filledUri = String.format(wsUri, credentialsProvider.get().getUser(), credentialsProvider.get().getPassword());
         } else {
-          filledUri = String.format(wsUri, credentialsProvider.getUser() + "." + credentialsProvider.getDeviceId(), credentialsProvider.getPassword());
+          filledUri = String.format(wsUri, credentialsProvider.get().getUser() + "." + credentialsProvider.get().getDeviceId(), credentialsProvider.get().getPassword());
         }
       } else {
         filledUri = wsUri;

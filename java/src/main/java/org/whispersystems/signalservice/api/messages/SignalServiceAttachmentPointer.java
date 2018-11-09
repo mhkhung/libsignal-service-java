@@ -20,7 +20,6 @@ public class SignalServiceAttachmentPointer extends SignalServiceAttachment {
 
   private final long              id;
   private final byte[]            key;
-  private final Optional<String>  relay;
   private final Optional<Integer> size;
   private final Optional<byte[]>  preview;
   private final Optional<byte[]>  digest;
@@ -28,17 +27,17 @@ public class SignalServiceAttachmentPointer extends SignalServiceAttachment {
   private final boolean           voiceNote;
   private final int               width;
   private final int               height;
+  private final Optional<String>  caption;
 
-  public SignalServiceAttachmentPointer(long id, String contentType, byte[] key, String relay,
+  public SignalServiceAttachmentPointer(long id, String contentType, byte[] key,
                                         Optional<Integer> size, Optional<byte[]> preview,
                                         int width, int height,
                                         Optional<byte[]> digest, Optional<String> fileName,
-                                        boolean voiceNote)
+                                        boolean voiceNote, Optional<String> caption)
   {
     super(contentType);
     this.id        = id;
     this.key       = key;
-    this.relay     = Optional.fromNullable(relay);
     this.size      = size;
     this.preview   = preview;
     this.width     = width;
@@ -46,6 +45,7 @@ public class SignalServiceAttachmentPointer extends SignalServiceAttachment {
     this.digest    = digest;
     this.fileName  = fileName;
     this.voiceNote = voiceNote;
+    this.caption   = caption;
   }
 
   public long getId() {
@@ -64,10 +64,6 @@ public class SignalServiceAttachmentPointer extends SignalServiceAttachment {
   @Override
   public boolean isPointer() {
     return true;
-  }
-
-  public Optional<String> getRelay() {
-    return relay;
   }
 
   public Optional<Integer> getSize() {
@@ -96,5 +92,9 @@ public class SignalServiceAttachmentPointer extends SignalServiceAttachment {
 
   public int getHeight() {
     return height;
+  }
+
+  public Optional<String> getCaption() {
+    return caption;
   }
 }
