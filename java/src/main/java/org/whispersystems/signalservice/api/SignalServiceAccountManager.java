@@ -425,7 +425,7 @@ public class SignalServiceAccountManager {
     IdentityKeyPair identity = new IdentityKeyPair(new IdentityKey(publicKey), privateKey);
     int deviceId = this.pushServiceSocket.finishNewDeviceRegistration(provisioningCode, signalingKey, supportsSms, fetchesMessages, registrationId, deviceName);
     credentialsProvider.setDeviceId(deviceId);
-    return new NewDeviceRegistrationReturn(identity, deviceId, msg.getNumber());
+    return new NewDeviceRegistrationReturn(identity, deviceId, msg.getNumber(), msg.hasProfileKey() ? msg.getProfileKey().toByteArray() : null, msg.hasReadReceipts() && msg.getReadReceipts());
   }
 
   public void addDevice(String deviceIdentifier,
@@ -525,11 +525,15 @@ public class SignalServiceAccountManager {
     private final IdentityKeyPair identity;
     private final int deviceId;
     private final String number;
+    private final byte[] profileKey;
+    private final boolean readReceipts;
     
-    NewDeviceRegistrationReturn(IdentityKeyPair identity, int deviceId, String number) {
+    NewDeviceRegistrationReturn(IdentityKeyPair identity, int deviceId, String number, byte[] profileKey, boolean readReceipts) {
       this.identity = identity;
       this.deviceId = deviceId;
       this.number = number;
+      this.profileKey = profileKey;
+      this.readReceipts = readReceipts;
     }
 
     /**
@@ -551,6 +555,20 @@ public class SignalServiceAccountManager {
      */
     public String getNumber() {
       return number;
+    }
+
+    /**
+     * @return The account's profile key or null
+     */
+    public byte[] getProfileKey() {
+      return profileKey;
+    }
+
+    /**
+     * @return The account's read receipts setting
+     */
+    public boolean isReadReceipts() {
+      return readReceipts;
     }
   }
 
