@@ -86,7 +86,7 @@ public class WebSocketConnection extends WebSocketListener {
   public WebSocketConnection(String httpUri, TrustStore trustStore, String userAgent, ConnectivityListener listener,
                              SleepTimer timer) {
     this.trustStore          = trustStore;
-    this.credentialsProvider = null;
+    this.credentialsProvider = Optional.absent();
     this.userAgent           = userAgent;
     this.listener            = listener;
     this.sleepTimer          = timer;
