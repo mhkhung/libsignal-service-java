@@ -29,6 +29,7 @@ public class SignalServiceDataMessage {
   private final boolean                                 profileKeyUpdate;
   private final Optional<Quote>                         quote;
   private final Optional<List<SharedContact>>           contacts;
+  private final Optional<List<Preview>>                 previews;
 
   /**
    * Construct a SignalServiceDataMessage with a body and no attachments.
@@ -102,7 +103,7 @@ public class SignalServiceDataMessage {
    * @param expiresInSeconds The number of seconds in which a message should disappear after having been seen.
    */
   public SignalServiceDataMessage(long timestamp, SignalServiceGroup group, List<SignalServiceAttachment> attachments, String body, int expiresInSeconds) {
-    this(timestamp, group, attachments, body, false, expiresInSeconds, false, null, false, null, null);
+    this(timestamp, group, attachments, body, false, expiresInSeconds, false, null, false, null, null, null);
   }
 
   /**
@@ -119,7 +120,7 @@ public class SignalServiceDataMessage {
                                   List<SignalServiceAttachment> attachments,
                                   String body, boolean endSession, int expiresInSeconds,
                                   boolean expirationUpdate, byte[] profileKey, boolean profileKeyUpdate,
-                                  Quote quote, List<SharedContact> sharedContacts)
+                                  Quote quote, List<SharedContact> sharedContacts, List<Preview> previews)
   {
     this.timestamp             = timestamp;
     this.body                  = Optional.fromNullable(body);
@@ -141,6 +142,12 @@ public class SignalServiceDataMessage {
       this.contacts = Optional.of(sharedContacts);
     } else {
       this.contacts = Optional.absent();
+    }
+
+    if (previews != null && !previews.isEmpty()) {
+      this.previews = Optional.of(previews);
+    } else {
+      this.previews = Optional.absent();
     }
   }
 
@@ -208,10 +215,15 @@ public class SignalServiceDataMessage {
     return contacts;
   }
 
+  public Optional<List<Preview>> getPreviews() {
+    return previews;
+  }
+
   public static class Builder {
 
     private List<SignalServiceAttachment> attachments    = new LinkedList<>();
     private List<SharedContact>           sharedContacts = new LinkedList<>();
+    private List<Preview>                 previews       = new LinkedList<>();
 
     private long               timestamp;
     private SignalServiceGroup group;
@@ -298,11 +310,16 @@ public class SignalServiceDataMessage {
       return this;
     }
 
+    public Builder withPreviews(List<Preview> previews) {
+      this.previews.addAll(previews);
+      return this;
+    }
+
     public SignalServiceDataMessage build() {
       if (timestamp == 0) timestamp = System.currentTimeMillis();
       return new SignalServiceDataMessage(timestamp, group, attachments, body, endSession,
                                           expiresInSeconds, expirationUpdate, profileKey,
-                                          profileKeyUpdate, quote, sharedContacts);
+                                          profileKeyUpdate, quote, sharedContacts, previews);
     }
   }
 
@@ -357,6 +374,30 @@ public class SignalServiceDataMessage {
       public SignalServiceAttachment getThumbnail() {
         return thumbnail;
       }
+    }
+  }
+
+  public static class Preview {
+    private final String                            url;
+    private final String                            title;
+    private final Optional<SignalServiceAttachment> image;
+
+    public Preview(String url, String title, Optional<SignalServiceAttachment> image) {
+      this.url   = url;
+      this.title = title;
+      this.image = image;
+    }
+
+    public String getUrl() {
+      return url;
+    }
+
+    public String getTitle() {
+      return title;
+    }
+
+    public Optional<SignalServiceAttachment> getImage() {
+      return image;
     }
   }
 
