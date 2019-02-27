@@ -158,8 +158,8 @@ public class SignalServiceAccountManager {
    *
    * @throws IOException
    */
-  public void requestSmsVerificationCode(boolean androidSmsRetrieverSupported) throws IOException {
-    this.pushServiceSocket.requestSmsVerificationCode(androidSmsRetrieverSupported);
+  public void requestSmsVerificationCode(boolean androidSmsRetrieverSupported, Optional<String> captchaToken) throws IOException {
+    this.pushServiceSocket.requestSmsVerificationCode(androidSmsRetrieverSupported, captchaToken);
   }
 
   /**
@@ -168,8 +168,8 @@ public class SignalServiceAccountManager {
    *
     * @throws IOException
    */
-  public void requestVoiceVerificationCode(Locale locale) throws IOException {
-    this.pushServiceSocket.requestVoiceVerificationCode(locale);
+  public void requestVoiceVerificationCode(Locale locale, Optional<String> captchaToken) throws IOException {
+    this.pushServiceSocket.requestVoiceVerificationCode(locale, captchaToken);
   }
 
   /**
@@ -358,17 +358,17 @@ public class SignalServiceAccountManager {
     }
   }
 
-  public void reportContactDiscoveryServiceAttestationError() {
+  public void reportContactDiscoveryServiceAttestationError(String reason) {
     try {
-      this.pushServiceSocket.reportContactDiscoveryServiceAttestationError();
+      this.pushServiceSocket.reportContactDiscoveryServiceAttestationError(reason);
     } catch (IOException e) {
       Log.w(TAG, "Request to indicate a contact discovery attestation error failed. Ignoring.", e);
     }
   }
 
-  public void reportContactDiscoveryServiceUnexpectedError() {
+  public void reportContactDiscoveryServiceUnexpectedError(String reason) {
     try {
-      this.pushServiceSocket.reportContactDiscoveryServiceUnexpectedError();
+      this.pushServiceSocket.reportContactDiscoveryServiceUnexpectedError(reason);
     } catch (IOException e) {
       Log.w(TAG, "Request to indicate a contact discovery unexpected error failed. Ignoring.", e);
     }
