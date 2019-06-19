@@ -39,6 +39,7 @@ import org.whispersystems.signalservice.api.messages.multidevice.ReadMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.RequestMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.SentTranscriptMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.SignalServiceSyncMessage;
+import org.whispersystems.signalservice.api.messages.multidevice.StickerPackOperationMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.VerifiedMessage;
 import org.whispersystems.signalservice.api.messages.shared.SharedContact;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
@@ -48,6 +49,7 @@ import org.whispersystems.signalservice.api.push.exceptions.UnregisteredUserExce
 import org.whispersystems.signalservice.api.util.CredentialsProvider;
 import org.whispersystems.signalservice.internal.configuration.SignalServiceConfiguration;
 import org.whispersystems.signalservice.internal.crypto.PaddingInputStream;
+import org.whispersystems.signalservice.internal.push.AttachmentUploadAttributes;
 import org.whispersystems.signalservice.internal.push.MismatchedDevices;
 import org.whispersystems.signalservice.internal.push.OutgoingPushMessage;
 import org.whispersystems.signalservice.internal.push.OutgoingPushMessageList;
@@ -73,6 +75,7 @@ import org.whispersystems.signalservice.internal.util.StaticCredentialsProvider;
 import org.whispersystems.signalservice.internal.util.Util;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.security.SecureRandom;
 import java.util.Collections;
 import java.util.Iterator;
@@ -244,7 +247,7 @@ public class SignalServiceMessageSender {
     SendMessageResult result    = sendMessage(recipient, getTargetUnidentifiedAccess(unidentifiedAccess), timestamp, content, false);
 
     if ((result.getSuccess() != null && result.getSuccess().isNeedsSync()) || (unidentifiedAccess.isPresent() && isMultiDevice.get())) {
-      byte[] syncMessage = createMultiDeviceSentTranscriptContent(content, Optional.of(recipient), timestamp, Collections.singletonList(result));
+      byte[] syncMessage = createMultiDeviceSentTranscriptContent(content, Optional.of(recipient), timestamp, Collections.singletonList(result), false);
       sendMessage(localAddress, Optional.<UnidentifiedAccess>absent(), timestamp, syncMessage, false);
     }
 
@@ -268,6 +271,7 @@ public class SignalServiceMessageSender {
    */
   public List<SendMessageResult> sendMessage(List<SignalServiceAddress>             recipients,
                                              List<Optional<UnidentifiedAccessPair>> unidentifiedAccess,
+                                             boolean                                isRecipientUpdate,
                                              SignalServiceDataMessage               message)
       throws IOException, UntrustedIdentityException
   {
@@ -284,7 +288,7 @@ public class SignalServiceMessageSender {
     }
 
     if (needsSyncInResults || (isMultiDevice.get())) {
-      byte[] syncMessage = createMultiDeviceSentTranscriptContent(content, Optional.<SignalServiceAddress>absent(), timestamp, results);
+      byte[] syncMessage = createMultiDeviceSentTranscriptContent(content, Optional.<SignalServiceAddress>absent(), timestamp, results, isRecipientUpdate);
       sendMessage(localAddress, Optional.<UnidentifiedAccess>absent(), timestamp, syncMessage, false);
     }
 
@@ -309,6 +313,8 @@ public class SignalServiceMessageSender {
       content = createMultiDeviceConfigurationContent(message.getConfiguration().get());
     } else if (message.getSent().isPresent()) {
       content = createMultiDeviceSentTranscriptContent(message.getSent().get(), unidentifiedAccess);
+    } else if (message.getStickerPackOperations().isPresent()) {
+      content = createMultiDeviceStickerPackOperationContent(message.getStickerPackOperations().get());
     } else if (message.getVerified().isPresent()) {
       sendMessage(message.getVerified().get(), unidentifiedAccess);
       return;
@@ -318,9 +324,10 @@ public class SignalServiceMessageSender {
       throw new IOException("Unsupported sync message!");
     }
 
-    sendMessage(localAddress, Optional.<UnidentifiedAccess>absent(),
-            message.getSent().isPresent() ? message.getSent().get().getTimestamp() : System.currentTimeMillis(),
-            content, false);
+    long timestamp = message.getSent().isPresent() ? message.getSent().get().getTimestamp()
+                                                   : System.currentTimeMillis();
+
+    sendMessage(localAddress, Optional.<UnidentifiedAccess>absent(), timestamp, content, false);
   }
 
   public void setSoTimeoutMillis(long soTimeoutMillis) {
@@ -340,17 +347,36 @@ public class SignalServiceMessageSender {
     this.isMultiDevice.set(isMultiDevice);
   }
 
-  public SignalServiceAttachmentPointer uploadAttachment(SignalServiceAttachmentStream attachment) throws IOException {
+  public SignalServiceAttachmentPointer uploadAttachment(SignalServiceAttachmentStream attachment, boolean usePadding) throws IOException {
     byte[]             attachmentKey    = Util.getSecretBytes(64);
-    long               paddedLength     = PaddingInputStream.getPaddedSize(attachment.getLength());
+    long               paddedLength     = usePadding ? PaddingInputStream.getPaddedSize(attachment.getLength())
+                                                     : attachment.getLength();
+    InputStream        dataStream       = usePadding ? new PaddingInputStream(attachment.getInputStream(), attachment.getLength())
+                                                     : attachment.getInputStream();
     long               ciphertextLength = AttachmentCipherOutputStream.getCiphertextLength(paddedLength);
     PushAttachmentData attachmentData   = new PushAttachmentData(attachment.getContentType(),
-                                                                 new PaddingInputStream(attachment.getInputStream(), attachment.getLength()),
+                                                                 dataStream,
                                                                  ciphertextLength,
                                                                  new AttachmentCipherOutputStreamFactory(attachmentKey),
                                                                  attachment.getListener());
 
-    Pair<Long, byte[]> attachmentIdAndDigest = socket.sendAttachment(attachmentData);
+    AttachmentUploadAttributes uploadAttributes = null;
+
+    if (pipe.get().isPresent()) {
+      Log.d(TAG, "Using pipe to retrieve attachment upload attributes...");
+      try {
+        uploadAttributes = pipe.get().get().getAttachmentUploadAttributes();
+      } catch (IOException e) {
+        Log.w(TAG, "Failed to retrieve attachment upload attributes using pipe. Falling back...");
+      }
+    }
+
+    if (uploadAttributes == null) {
+      Log.d(TAG, "Not using pipe to retrieve attachment upload attributes...");
+      uploadAttributes = socket.getAttachmentUploadAttributes();
+    }
+
+    Pair<Long, byte[]> attachmentIdAndDigest = socket.uploadAttachment(attachmentData, uploadAttributes);
 
     return new SignalServiceAttachmentPointer(attachmentIdAndDigest.first(),
                                               attachment.getContentType(),
@@ -505,6 +531,22 @@ public class SignalServiceMessageSender {
       }
     }
 
+    if (message.getSticker().isPresent()) {
+      DataMessage.Sticker.Builder stickerBuilder = DataMessage.Sticker.newBuilder();
+
+      stickerBuilder.setPackId(ByteString.copyFrom(message.getSticker().get().getPackId()));
+      stickerBuilder.setPackKey(ByteString.copyFrom(message.getSticker().get().getPackKey()));
+      stickerBuilder.setStickerId(message.getSticker().get().getStickerId());
+
+      if (message.getSticker().get().getAttachment().isStream()) {
+        stickerBuilder.setData(createAttachmentPointer(message.getSticker().get().getAttachment().asStream(), true));
+      } else {
+        stickerBuilder.setData(createAttachmentPointer(message.getSticker().get().getAttachment().asPointer()));
+      }
+
+      builder.setSticker(stickerBuilder.build());
+    }
+
     builder.setTimestamp(message.getTimestamp());
 
     return container.setDataMessage(builder).build().toByteArray();
@@ -570,11 +612,13 @@ public class SignalServiceMessageSender {
     return createMultiDeviceSentTranscriptContent(createMessageContent(transcript.getMessage()),
                                                   Optional.of(address),
                                                   transcript.getTimestamp(),
-                                                  Collections.singletonList(result));
+                                                  Collections.singletonList(result),
+                                                  false);
   }
 
   private byte[] createMultiDeviceSentTranscriptContent(byte[] content, Optional<SignalServiceAddress> recipient,
-                                                        long timestamp, List<SendMessageResult> sendMessageResults)
+                                                        long timestamp, List<SendMessageResult> sendMessageResults,
+                                                        boolean isRecipientUpdate)
   {
     try {
       Content.Builder          container   = Content.newBuilder();
@@ -600,6 +644,8 @@ public class SignalServiceMessageSender {
       if (dataMessage.getExpireTimer() > 0) {
         sentMessage.setExpirationStartTimestamp(System.currentTimeMillis());
       }
+
+      sentMessage.setIsRecipientUpdate(isRecipientUpdate);
 
       return container.setSyncMessage(syncMessage.setSent(sentMessage)).build().toByteArray();
     } catch (InvalidProtocolBufferException e) {
@@ -665,6 +711,34 @@ public class SignalServiceMessageSender {
     }
 
     return container.setSyncMessage(syncMessage.setConfiguration(configurationMessage)).build().toByteArray();
+  }
+
+  private byte[] createMultiDeviceStickerPackOperationContent(List<StickerPackOperationMessage> stickerPackOperations) {
+    Content.Builder     container   = Content.newBuilder();
+    SyncMessage.Builder syncMessage = createSyncMessageBuilder();
+
+    for (StickerPackOperationMessage stickerPackOperation : stickerPackOperations) {
+      SyncMessage.StickerPackOperation.Builder builder = SyncMessage.StickerPackOperation.newBuilder();
+
+      if (stickerPackOperation.getPackId().isPresent()) {
+        builder.setPackId(ByteString.copyFrom(stickerPackOperation.getPackId().get()));
+      }
+
+      if (stickerPackOperation.getPackKey().isPresent()) {
+        builder.setPackKey(ByteString.copyFrom(stickerPackOperation.getPackKey().get()));
+      }
+
+      if (stickerPackOperation.getType().isPresent()) {
+        switch (stickerPackOperation.getType().get()) {
+          case INSTALL: builder.setType(SyncMessage.StickerPackOperation.Type.INSTALL); break;
+          case REMOVE:  builder.setType(SyncMessage.StickerPackOperation.Type.REMOVE); break;
+        }
+      }
+
+      syncMessage.addStickerPackOperation(builder);
+    }
+
+    return container.setSyncMessage(syncMessage).build().toByteArray();
   }
 
   private byte[] createMultiDeviceVerifiedContent(VerifiedMessage verifiedMessage, byte[] nullMessage) {
@@ -969,9 +1043,15 @@ public class SignalServiceMessageSender {
   }
 
   private AttachmentPointer createAttachmentPointer(SignalServiceAttachmentStream attachment)
+    throws IOException
+  {
+    return createAttachmentPointer(attachment, false);
+  }
+
+  private AttachmentPointer createAttachmentPointer(SignalServiceAttachmentStream attachment, boolean usePadding)
       throws IOException
   {
-    SignalServiceAttachmentPointer pointer = uploadAttachment(attachment);
+    SignalServiceAttachmentPointer pointer = uploadAttachment(attachment, usePadding);
     return createAttachmentPointer(pointer);
   }
 
