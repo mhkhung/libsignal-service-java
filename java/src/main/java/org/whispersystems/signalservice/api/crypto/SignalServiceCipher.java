@@ -56,6 +56,7 @@ import org.whispersystems.signalservice.api.messages.calls.OfferMessage;
 import org.whispersystems.signalservice.api.messages.calls.SignalServiceCallMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.BlockedListMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.ContactsMessage;
+import org.whispersystems.signalservice.api.messages.multidevice.MessageTimerReadMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.ReadMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.RequestMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.SentTranscriptMessage;
@@ -311,7 +312,8 @@ public class SignalServiceCipher {
                                         quote,
                                         sharedContacts,
                                         previews,
-                                        sticker);
+                                        sticker,
+                                        content.getMessageTimer());
   }
 
   private SignalServiceSyncMessage createSynchronizeMessage(Metadata metadata, SyncMessage content)
@@ -345,6 +347,12 @@ public class SignalServiceCipher {
       }
 
       return SignalServiceSyncMessage.forRead(readMessages);
+    }
+
+    if (content.hasMessageTimerRead()) {
+      MessageTimerReadMessage timerRead = new MessageTimerReadMessage(content.getMessageTimerRead().getSender(),
+                                                                      content.getMessageTimerRead().getTimestamp());
+      return SignalServiceSyncMessage.forMessageTimerRead(timerRead);
     }
 
     if(content.hasContacts()) {
