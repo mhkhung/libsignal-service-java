@@ -1,5 +1,5 @@
 subprojects {
-    ext.version_number     = "2.13.5_unofficial_1"
+    ext.version_number     = "2.13.6_unofficial_1"
     ext.group_info         = "com.github.turasa"
     ext.signal_version     = "0.0.3"
 
