@@ -54,9 +54,9 @@ import org.whispersystems.signalservice.api.messages.calls.HangupMessage;
 import org.whispersystems.signalservice.api.messages.calls.IceUpdateMessage;
 import org.whispersystems.signalservice.api.messages.calls.OfferMessage;
 import org.whispersystems.signalservice.api.messages.calls.SignalServiceCallMessage;
+import org.whispersystems.signalservice.api.messages.multidevice.ViewOnceOpenMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.BlockedListMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.ContactsMessage;
-import org.whispersystems.signalservice.api.messages.multidevice.MessageTimerReadMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.ReadMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.RequestMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.SentTranscriptMessage;
@@ -313,7 +313,7 @@ public class SignalServiceCipher {
                                         sharedContacts,
                                         previews,
                                         sticker,
-                                        content.getMessageTimer());
+                                        content.getIsViewOnce());
   }
 
   private SignalServiceSyncMessage createSynchronizeMessage(Metadata metadata, SyncMessage content)
@@ -349,10 +349,10 @@ public class SignalServiceCipher {
       return SignalServiceSyncMessage.forRead(readMessages);
     }
 
-    if (content.hasMessageTimerRead()) {
-      MessageTimerReadMessage timerRead = new MessageTimerReadMessage(content.getMessageTimerRead().getSender(),
-                                                                      content.getMessageTimerRead().getTimestamp());
-      return SignalServiceSyncMessage.forMessageTimerRead(timerRead);
+    if (content.hasViewOnceOpen()) {
+      ViewOnceOpenMessage timerRead = new ViewOnceOpenMessage(content.getViewOnceOpen().getSender(),
+                                                                      content.getViewOnceOpen().getTimestamp());
+      return SignalServiceSyncMessage.forViewOnceOpen(timerRead);
     }
 
     if(content.hasContacts()) {
