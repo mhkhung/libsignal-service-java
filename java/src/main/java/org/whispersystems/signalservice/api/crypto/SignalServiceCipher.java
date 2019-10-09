@@ -366,7 +366,8 @@ public class SignalServiceCipher {
           pointer.hasDigest() ? Optional.of(pointer.getDigest().toByteArray()) : Optional.<byte[]>absent(),
           pointer.hasFileName() ? Optional.of(pointer.getFileName()) : Optional.<String>absent(),
           (pointer.getFlags() & AttachmentPointer.Flags.VOICE_MESSAGE_VALUE) != 0,
-           pointer.hasCaption() ? Optional.of(pointer.getCaption()) : Optional.<String>absent()
+           pointer.hasCaption() ? Optional.of(pointer.getCaption()) : Optional.<String>absent(),
+           pointer.hasBlurHash() ? Optional.of(pointer.getBlurHash()) : Optional.<String>absent()
           ), content.getContacts().hasComplete() && content.getContacts().getComplete()
         )
       );
@@ -383,7 +384,8 @@ public class SignalServiceCipher {
           pointer.hasDigest() ? Optional.of(pointer.getDigest().toByteArray()) : Optional.<byte[]>absent(),
           pointer.hasFileName() ? Optional.of(pointer.getFileName()) : Optional.<String>absent(),
           (pointer.getFlags() & AttachmentPointer.Flags.VOICE_MESSAGE_VALUE) != 0,
-          pointer.hasCaption() ? Optional.of(pointer.getCaption()) : Optional.<String>absent()
+          pointer.hasCaption() ? Optional.of(pointer.getCaption()) : Optional.<String>absent(),
+          pointer.hasBlurHash() ? Optional.of(pointer.getBlurHash()) : Optional.<String>absent()
         )
       );
     }
@@ -660,7 +662,8 @@ public class SignalServiceCipher {
                                               pointer.hasDigest() ? Optional.of(pointer.getDigest().toByteArray()) : Optional.<byte[]>absent(),
                                               pointer.hasFileName() ? Optional.of(pointer.getFileName()) : Optional.<String>absent(),
                                               (pointer.getFlags() & AttachmentPointer.Flags.VOICE_MESSAGE_VALUE) != 0,
-                                              pointer.hasCaption() ? Optional.of(pointer.getCaption()) : Optional.<String>absent());
+                                              pointer.hasCaption() ? Optional.of(pointer.getCaption()) : Optional.<String>absent(),
+                                              pointer.hasBlurHash() ? Optional.of(pointer.getBlurHash()) : Optional.<String>absent());
 
   }
 
@@ -701,6 +704,7 @@ public class SignalServiceCipher {
                                                     Optional.fromNullable(pointer.hasDigest() ? pointer.getDigest().toByteArray() : null),
                                                     Optional.<String>absent(),
                                                     false,
+                                                    Optional.<String>absent(),
                                                     Optional.<String>absent());
       }
 
