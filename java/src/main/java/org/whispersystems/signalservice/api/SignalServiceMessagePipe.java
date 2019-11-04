@@ -19,10 +19,10 @@ import org.whispersystems.signalservice.api.util.CredentialsProvider;
 import org.whispersystems.signalservice.internal.push.AttachmentUploadAttributes;
 import org.whispersystems.signalservice.internal.push.OutgoingPushMessageList;
 import org.whispersystems.signalservice.internal.push.SendMessageResponse;
-import org.whispersystems.signalservice.internal.util.Base64;
 import org.whispersystems.signalservice.internal.util.JsonUtil;
 import org.whispersystems.signalservice.internal.util.Util;
 import org.whispersystems.signalservice.internal.websocket.WebSocketConnection;
+import org.whispersystems.util.Base64;
 
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
@@ -162,7 +162,7 @@ public class SignalServiceMessagePipe {
       WebSocketRequestMessage requestMessage = WebSocketRequestMessage.newBuilder()
                                                                       .setId(SecureRandom.getInstance("SHA1PRNG").nextLong())
                                                                       .setVerb("GET")
-                                                                      .setPath(String.format("/v1/profile/%s", address.getNumber()))
+                                                                      .setPath(String.format("/v1/profile/%s", address.getIdentifier()))
                                                                       .addAllHeaders(headers)
                                                                       .build();
 

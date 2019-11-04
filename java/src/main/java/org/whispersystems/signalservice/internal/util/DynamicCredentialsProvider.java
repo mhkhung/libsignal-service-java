@@ -2,29 +2,44 @@ package org.whispersystems.signalservice.internal.util;
 
 import org.whispersystems.signalservice.api.util.CredentialsProvider;
 
+import java.util.UUID;
+
 public class DynamicCredentialsProvider implements CredentialsProvider {
 
-  private String user;
+  private UUID   uuid;
+  private String e164;
   private String password;
   private String signalingKey;
   private int deviceId;
   
-  public DynamicCredentialsProvider(String user, String password, String signalingKey, int deviceId) {
+  public DynamicCredentialsProvider(UUID uuid, String e164, String password, String signalingKey, int deviceId) {
     super();
-    this.user = user;
+    this.uuid = uuid;
+    this.e164 = e164;
     this.password = password;
     this.signalingKey = signalingKey;
     this.deviceId = deviceId;
   }
 
-  public String getUser() {
-    return user;
+  @Override
+  public UUID getUuid() {
+    return null;
   }
 
-  public void setUser(String user) {
-    this.user = user;
+  public void setUuid(UUID uuid) {
+    this.uuid = uuid;
   }
 
+  @Override
+  public String getE164() {
+    return e164;
+  }
+
+  public void setE164(String e164) {
+    this.e164 = e164;
+  }
+
+  @Override
   public String getPassword() {
     return password;
   }
@@ -33,6 +48,7 @@ public class DynamicCredentialsProvider implements CredentialsProvider {
     this.password = password;
   }
 
+  @Override
   public String getSignalingKey() {
     return signalingKey;
   }

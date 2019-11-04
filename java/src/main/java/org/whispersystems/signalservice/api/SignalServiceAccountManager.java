@@ -31,7 +31,6 @@ import org.whispersystems.signalservice.api.messages.multidevice.DeviceInfo;
 import org.whispersystems.signalservice.api.push.ContactTokenDetails;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.api.push.SignedPreKeyEntity;
-import org.whispersystems.signalservice.api.util.CredentialsProvider;
 import org.whispersystems.signalservice.api.util.SleepTimer;
 import org.whispersystems.signalservice.api.util.StreamDetails;
 import org.whispersystems.signalservice.internal.configuration.SignalServiceConfiguration;
@@ -50,9 +49,9 @@ import org.whispersystems.signalservice.internal.push.ProfileAvatarData;
 import org.whispersystems.signalservice.internal.push.ProvisioningSocket;
 import org.whispersystems.signalservice.internal.push.PushServiceSocket;
 import org.whispersystems.signalservice.internal.push.http.ProfileCipherOutputStreamFactory;
-import org.whispersystems.signalservice.internal.util.Base64;
 import org.whispersystems.signalservice.internal.util.DynamicCredentialsProvider;
 import org.whispersystems.signalservice.internal.util.Util;
+import org.whispersystems.util.Base64;
 
 import java.io.IOException;
 import java.security.KeyStore;
@@ -68,6 +67,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.whispersystems.signalservice.internal.push.ProvisioningProtos.ProvisionMessage;
 
@@ -96,25 +96,26 @@ public class SignalServiceAccountManager {
    * @param userAgent A string which identifies the client software.
    */
   public SignalServiceAccountManager(SignalServiceConfiguration configuration,
-                                     String user, String password, int deviceId,
+                                     UUID uuid, String e164, String password, int deviceId,
                                      String userAgent, SleepTimer timer)
   {
-    this(configuration, new DynamicCredentialsProvider(user, password, null, deviceId), userAgent, timer);
+    this(configuration, new DynamicCredentialsProvider(uuid, e164, password, null, deviceId), userAgent, timer);
   }
   
   /**
    * Construct a SignalServiceAccountManager.
    *
    * @param configuration The URL for the Signal Service.
-   * @param user A Signal Service phone number.
+   * @param uuid The Signal Service UUID.
+   * @param e164 The Signal Service phone number.
    * @param password A Signal Service password.
    * @param userAgent A string which identifies the client software.
    */
   public SignalServiceAccountManager(SignalServiceConfiguration configuration,
-                                     String user, String password,
+                                     UUID uuid, String e164, String password,
                                      String userAgent, SleepTimer timer)
   {
-    this(configuration, user, password, SignalServiceAddress.DEFAULT_DEVICE_ID, userAgent, timer);
+    this(configuration, uuid, e164, password, SignalServiceAddress.DEFAULT_DEVICE_ID, userAgent, timer);
   }
 
   public SignalServiceAccountManager(SignalServiceConfiguration configuration,
@@ -130,12 +131,20 @@ public class SignalServiceAccountManager {
     return this.pushServiceSocket.getSenderCertificate();
   }
 
+  public byte[] getSenderCertificateLegacy() throws IOException {
+    return this.pushServiceSocket.getSenderCertificateLegacy();
+  }
+
   public void setPin(Optional<String> pin) throws IOException {
     if (pin.isPresent()) {
       this.pushServiceSocket.setPin(pin.get());
     } else {
       this.pushServiceSocket.removePin();
     }
+  }
+
+  public UUID getOwnUuid() throws IOException {
+    return this.pushServiceSocket.getOwnUuid();
   }
 
   /**
@@ -202,18 +211,18 @@ public class SignalServiceAccountManager {
    *                                     This value should remain consistent across registrations for the
    *                                     same install, but probabilistically differ across registrations
    *                                     for separate installs.
-   *
+   * @return The UUID of the user that was registered.
    * @throws IOException
    */
-  public void verifyAccountWithCode(String verificationCode, String signalingKey, int signalProtocolRegistrationId, boolean fetchesMessages, String pin,
-                                    byte[] unidentifiedAccessKey, boolean unrestrictedUnidentifiedAccess)
+  public UUID verifyAccountWithCode(String verificationCode, String signalingKey, int signalProtocolRegistrationId, boolean fetchesMessages, String pin,
+                                      byte[] unidentifiedAccessKey, boolean unrestrictedUnidentifiedAccess)
       throws IOException
   {
-    this.pushServiceSocket.verifyAccountCode(verificationCode, signalingKey,
-                                             signalProtocolRegistrationId,
-                                             fetchesMessages, pin,
-                                             unidentifiedAccessKey,
-                                             unrestrictedUnidentifiedAccess);
+    return this.pushServiceSocket.verifyAccountCode(verificationCode, signalingKey,
+                                                    signalProtocolRegistrationId,
+                                                    fetchesMessages, pin,
+                                                    unidentifiedAccessKey,
+                                                    unrestrictedUnidentifiedAccess);
   }
 
   /**
@@ -429,7 +438,7 @@ public class SignalServiceAccountManager {
    */
   public NewDeviceRegistrationReturn finishNewDeviceRegistration(IdentityKeyPair tempIdentity, String signalingKey, boolean supportsSms, boolean fetchesMessages, int registrationId, String deviceName) throws TimeoutException, IOException, InvalidKeyException {
     ProvisionMessage msg = provisioningSocket.getProvisioningMessage(tempIdentity);
-    credentialsProvider.setUser(msg.getNumber());
+    credentialsProvider.setE164(msg.getNumber());
     String provisioningCode = msg.getProvisioningCode();
     byte[] publicKeyBytes = msg.getIdentityKeyPublic().toByteArray();
     if (publicKeyBytes.length == 32) {
@@ -458,7 +467,7 @@ public class SignalServiceAccountManager {
     ProvisionMessage.Builder message = ProvisionMessage.newBuilder()
                                                        .setIdentityKeyPublic(ByteString.copyFrom(identityKeyPair.getPublicKey().serialize()))
                                                        .setIdentityKeyPrivate(ByteString.copyFrom(identityKeyPair.getPrivateKey().serialize()))
-                                                       .setNumber(credentialsProvider.getUser())
+                                                       .setNumber(credentialsProvider.getE164())
                                                        .setProvisioningCode(code);
 
     if (profileKey.isPresent()) {

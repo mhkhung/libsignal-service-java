@@ -102,10 +102,11 @@ public class WebSocketConnection extends WebSocketListener {
     if (client == null) {
       String filledUri;
       if (credentialsProvider.isPresent()) {
+        String identifier = credentialsProvider.get().getUuid() != null ? credentialsProvider.get().getUuid().toString() : credentialsProvider.get().getE164();
         if (credentialsProvider.get().getDeviceId() == SignalServiceAddress.DEFAULT_DEVICE_ID) {
-          filledUri = String.format(wsUri, credentialsProvider.get().getUser(), credentialsProvider.get().getPassword());
+          filledUri = String.format(wsUri, identifier, credentialsProvider.get().getPassword());
         } else {
-          filledUri = String.format(wsUri, credentialsProvider.get().getUser() + "." + credentialsProvider.get().getDeviceId(), credentialsProvider.get().getPassword());
+          filledUri = String.format(wsUri, identifier + "." + credentialsProvider.get().getDeviceId(), credentialsProvider.get().getPassword());
         }
       } else {
         filledUri = wsUri;

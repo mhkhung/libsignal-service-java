@@ -36,6 +36,7 @@ import org.whispersystems.signalservice.api.push.exceptions.RemoteAttestationRes
 import org.whispersystems.signalservice.api.push.exceptions.UnregisteredUserException;
 import org.whispersystems.signalservice.api.util.CredentialsProvider;
 import org.whispersystems.signalservice.api.util.Tls12SocketFactory;
+import org.whispersystems.signalservice.api.util.UuidUtil;
 import org.whispersystems.signalservice.internal.configuration.SignalServiceConfiguration;
 import org.whispersystems.signalservice.internal.configuration.SignalUrl;
 import org.whispersystems.signalservice.internal.contacts.entities.DiscoveryRequest;
@@ -46,15 +47,14 @@ import org.whispersystems.signalservice.internal.push.exceptions.MismatchedDevic
 import org.whispersystems.signalservice.internal.push.exceptions.StaleDevicesException;
 import org.whispersystems.signalservice.internal.push.http.DigestingRequestBody;
 import org.whispersystems.signalservice.internal.push.http.OutputStreamFactory;
-import org.whispersystems.signalservice.internal.util.Base64;
 import org.whispersystems.signalservice.internal.util.BlacklistingTrustManager;
 import org.whispersystems.signalservice.internal.util.Hex;
 import org.whispersystems.signalservice.internal.util.JsonUtil;
 import org.whispersystems.signalservice.internal.util.Util;
+import org.whispersystems.util.Base64;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -73,11 +73,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
@@ -92,10 +91,6 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
-import okio.Buffer;
-import okio.BufferedSink;
-import okio.BufferedSource;
-import okio.Okio;
 
 /**
  *
@@ -115,6 +110,7 @@ public class PushServiceSocket {
   private static final String SET_ACCOUNT_ATTRIBUTES    = "/v1/accounts/attributes/";
   private static final String PIN_PATH                  = "/v1/accounts/pin/";
   private static final String REQUEST_PUSH_CHALLENGE    = "/v1/accounts/fcm/preauth/%s/%s";
+  private static final String WHO_AM_I                  = "/v1/accounts/whoami";
 
   private static final String PREKEY_METADATA_PATH      = "/v2/keys/";
   private static final String PREKEY_PATH               = "/v2/keys/%s";
@@ -136,7 +132,8 @@ public class PushServiceSocket {
 
   private static final String PROFILE_PATH              = "/v1/profile/%s";
 
-  private static final String SENDER_CERTIFICATE_PATH   = "/v1/certificate/delivery";
+  private static final String SENDER_CERTIFICATE_LEGACY_PATH = "/v1/certificate/delivery";
+  private static final String SENDER_CERTIFICATE_PATH        = "/v1/certificate/delivery?includeUuid=true";
 
   private static final String ATTACHMENT_DOWNLOAD_PATH  = "attachments/%d";
   private static final String ATTACHMENT_UPLOAD_PATH    = "attachments/";
@@ -170,7 +167,7 @@ public class PushServiceSocket {
   }
 
   public void requestSmsVerificationCode(boolean androidSmsRetriever, Optional<String> captchaToken, Optional<String> challenge) throws IOException {
-    String path = String.format(CREATE_ACCOUNT_SMS_PATH, credentialsProvider.getUser(), androidSmsRetriever ? "android-ng" : "android");
+    String path = String.format(CREATE_ACCOUNT_SMS_PATH, credentialsProvider.getE164(), androidSmsRetriever ? "android-ng" : "android");
 
     if (captchaToken.isPresent()) {
       path += "&captcha=" + captchaToken.get();
@@ -190,7 +187,7 @@ public class PushServiceSocket {
 
   public void requestVoiceVerificationCode(Locale locale, Optional<String> captchaToken, Optional<String> challenge) throws IOException {
     Map<String, String> headers = locale != null ? Collections.singletonMap("Accept-Language", locale.getLanguage() + "-" + locale.getCountry()) : NO_HEADERS;
-    String              path    = String.format(CREATE_ACCOUNT_VOICE_PATH, credentialsProvider.getUser());
+    String              path    = String.format(CREATE_ACCOUNT_VOICE_PATH, credentialsProvider.getE164());
 
     if (captchaToken.isPresent()) {
       path += "?captcha=" + captchaToken.get();
@@ -208,14 +205,33 @@ public class PushServiceSocket {
     });
   }
 
-  public void verifyAccountCode(String verificationCode, String signalingKey, int registrationId, boolean fetchesMessages, String pin,
+  public UUID getOwnUuid() throws IOException {
+    String         body     = makeServiceRequest(WHO_AM_I, "GET", null);
+    WhoAmIResponse response = JsonUtil.fromJson(body, WhoAmIResponse.class);
+    Optional<UUID> uuid     = UuidUtil.parse(response.getUuid());
+
+    if (uuid.isPresent()) {
+      return uuid.get();
+    } else {
+      throw new IOException("Invalid UUID!");
+    }
+  }
+
+  public UUID verifyAccountCode(String verificationCode, String signalingKey, int registrationId, boolean fetchesMessages, String pin,
                                 byte[] unidentifiedAccessKey, boolean unrestrictedUnidentifiedAccess)
       throws IOException
   {
-    AccountAttributes signalingKeyEntity = new AccountAttributes(signalingKey, registrationId, fetchesMessages, pin,
-                                                                 unidentifiedAccessKey, unrestrictedUnidentifiedAccess);
-    makeServiceRequest(String.format(VERIFY_ACCOUNT_CODE_PATH, verificationCode),
-                       "PUT", JsonUtil.toJson(signalingKeyEntity));
+    AccountAttributes     signalingKeyEntity = new AccountAttributes(signalingKey, registrationId, fetchesMessages, pin, unidentifiedAccessKey, unrestrictedUnidentifiedAccess);
+    String                requestBody        = JsonUtil.toJson(signalingKeyEntity);
+    String                responseBody       = makeServiceRequest(String.format(VERIFY_ACCOUNT_CODE_PATH, verificationCode), "PUT", requestBody);
+    VerifyAccountResponse response           = JsonUtil.fromJson(responseBody, VerifyAccountResponse.class);
+    Optional<UUID>        uuid               = UuidUtil.parse(response.getUuid());
+
+    if (uuid.isPresent()) {
+      return uuid.get();
+    } else {
+      throw new IOException("Invalid UUID!");
+    }
   }
 
   public void setAccountAttributes(String signalingKey, int registrationId, boolean fetchesMessages, String pin,
@@ -275,6 +291,11 @@ public class PushServiceSocket {
 
   public void removePin() throws IOException {
     makeServiceRequest(PIN_PATH, "DELETE", null);
+  }
+
+  public byte[] getSenderCertificateLegacy() throws IOException {
+    String responseText = makeServiceRequest(SENDER_CERTIFICATE_LEGACY_PATH, "GET", null);
+    return JsonUtil.fromJson(responseText, SenderCertificate.class).getCertificate();
   }
 
   public byte[] getSenderCertificate() throws IOException {
@@ -348,7 +369,7 @@ public class PushServiceSocket {
       if (deviceId.equals("1"))
         deviceId = "*";
 
-      String path = String.format(PREKEY_DEVICE_PATH, destination.getNumber(), deviceId);
+      String path = String.format(PREKEY_DEVICE_PATH, destination.getIdentifier(), deviceId);
 
       if (destination.getRelay().isPresent()) {
         path = path + "?relay=" + destination.getRelay().get();
@@ -383,13 +404,13 @@ public class PushServiceSocket {
 
       return bundles;
     } catch (NotFoundException nfe) {
-      throw new UnregisteredUserException(destination.getNumber(), nfe);
+      throw new UnregisteredUserException(destination.getIdentifier(), nfe);
     }
   }
 
   public PreKeyBundle getPreKey(SignalServiceAddress destination, int deviceId) throws IOException {
     try {
-      String path = String.format(PREKEY_DEVICE_PATH, destination.getNumber(),
+      String path = String.format(PREKEY_DEVICE_PATH, destination.getIdentifier(),
                                   String.valueOf(deviceId));
 
       if (destination.getRelay().isPresent()) {
@@ -423,7 +444,7 @@ public class PushServiceSocket {
       return new PreKeyBundle(device.getRegistrationId(), device.getDeviceId(), preKeyId, preKey,
                               signedPreKeyId, signedPreKey, signedPreKeySignature, response.getIdentityKey());
     } catch (NotFoundException nfe) {
-      throw new UnregisteredUserException(destination.getNumber(), nfe);
+      throw new UnregisteredUserException(destination.getIdentifier(), nfe);
     }
   }
 
@@ -483,7 +504,7 @@ public class PushServiceSocket {
       throws NonSuccessfulResponseCodeException, PushNetworkException
   {
     try {
-      String response = makeServiceRequest(String.format(PROFILE_PATH, target.getNumber()), "GET", null, NO_HEADERS, unidentifiedAccess);
+      String response = makeServiceRequest(String.format(PROFILE_PATH, target.getIdentifier()), "GET", null, NO_HEADERS, unidentifiedAccess);
       return JsonUtil.fromJson(response, SignalServiceProfile.class);
     } catch (IOException e) {
       Log.w(TAG, e);
@@ -1071,10 +1092,11 @@ public class PushServiceSocket {
 
   private String getAuthorizationHeader(CredentialsProvider credentialsProvider) {
     try {
+      String identifier = credentialsProvider.getUuid() != null ? credentialsProvider.getUuid().toString() : credentialsProvider.getE164();
       if(credentialsProvider.getDeviceId() == SignalServiceAddress.DEFAULT_DEVICE_ID) {
-        return "Basic " + Base64.encodeBytes((credentialsProvider.getUser() + ":" + credentialsProvider.getPassword()).getBytes("UTF-8"));
+        return "Basic " + Base64.encodeBytes((identifier + ":" + credentialsProvider.getPassword()).getBytes("UTF-8"));
       } else {
-        return "Basic " + Base64.encodeBytes((credentialsProvider.getUser() + "." + credentialsProvider.getDeviceId() + ":" + credentialsProvider.getPassword()).getBytes("UTF-8"));
+        return "Basic " + Base64.encodeBytes((identifier + "." + credentialsProvider.getDeviceId() + ":" + credentialsProvider.getPassword()).getBytes("UTF-8"));
       }
     } catch (UnsupportedEncodingException e) {
       throw new AssertionError(e);
