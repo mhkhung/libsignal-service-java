@@ -70,6 +70,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.whispersystems.signalservice.internal.push.ProvisioningProtos.ProvisionMessage;
+import static org.whispersystems.signalservice.internal.push.ProvisioningProtos.ProvisioningVersion;
 
 /**
  * The main interface for creating, registering, and
@@ -90,7 +91,8 @@ public class SignalServiceAccountManager {
    * Construct a SignalServiceAccountManager.
    *
    * @param configuration The URL for the Signal Service.
-   * @param user A Signal Service phone number.
+   * @param uuid The Signal Service UUID.
+   * @param e164 The Signal Service phone number.
    * @param password A Signal Service password.
    * @param deviceId A integer which is provided by the server while linking.
    * @param userAgent A string which identifies the client software.
@@ -467,8 +469,15 @@ public class SignalServiceAccountManager {
     ProvisionMessage.Builder message = ProvisionMessage.newBuilder()
                                                        .setIdentityKeyPublic(ByteString.copyFrom(identityKeyPair.getPublicKey().serialize()))
                                                        .setIdentityKeyPrivate(ByteString.copyFrom(identityKeyPair.getPrivateKey().serialize()))
-                                                       .setNumber(credentialsProvider.getE164())
-                                                       .setProvisioningCode(code);
+                                                       .setProvisioningCode(code)
+                                                       .setProvisioningVersion(ProvisioningVersion.CURRENT_VALUE);
+    if (credentialsProvider.getE164() != null) {
+      message.setNumber(credentialsProvider.getE164());
+    }
+
+    if (credentialsProvider.getUuid() != null) {
+      message.setUuid(credentialsProvider.getUuid().toString());
+    }
 
     if (profileKey.isPresent()) {
       message.setProfileKey(ByteString.copyFrom(profileKey.get()));

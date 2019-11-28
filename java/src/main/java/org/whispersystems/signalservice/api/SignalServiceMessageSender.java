@@ -54,6 +54,7 @@ import org.whispersystems.signalservice.internal.push.AttachmentUploadAttributes
 import org.whispersystems.signalservice.internal.push.MismatchedDevices;
 import org.whispersystems.signalservice.internal.push.OutgoingPushMessage;
 import org.whispersystems.signalservice.internal.push.OutgoingPushMessageList;
+import org.whispersystems.signalservice.internal.push.ProvisioningProtos;
 import org.whispersystems.signalservice.internal.push.PushAttachmentData;
 import org.whispersystems.signalservice.internal.push.PushServiceSocket;
 import org.whispersystems.signalservice.internal.push.SendMessageResponse;
@@ -326,6 +327,8 @@ public class SignalServiceMessageSender {
       content = createMultiDeviceSentTranscriptContent(message.getSent().get(), unidentifiedAccess);
     } else if (message.getStickerPackOperations().isPresent()) {
       content = createMultiDeviceStickerPackOperationContent(message.getStickerPackOperations().get());
+    } else if (message.getFetchType().isPresent()) {
+      content = createMultiDeviceFetchTypeContent(message.getFetchType().get());
     } else if (message.getVerified().isPresent()) {
       sendMessage(message.getVerified().get(), unidentifiedAccess);
       return;
@@ -781,6 +784,8 @@ public class SignalServiceMessageSender {
       configurationMessage.setLinkPreviews(configuration.getLinkPreviews().get());
     }
 
+    configurationMessage.setProvisioningVersion(ProvisioningProtos.ProvisioningVersion.CURRENT_VALUE);
+
     return container.setSyncMessage(syncMessage.setConfiguration(configurationMessage)).build().toByteArray();
   }
 
@@ -810,6 +815,26 @@ public class SignalServiceMessageSender {
     }
 
     return container.setSyncMessage(syncMessage).build().toByteArray();
+  }
+
+  private byte[] createMultiDeviceFetchTypeContent(SignalServiceSyncMessage.FetchType fetchType) {
+    Content.Builder                 container    = Content.newBuilder();
+    SyncMessage.Builder             syncMessage  = createSyncMessageBuilder();
+    SyncMessage.FetchLatest.Builder fetchMessage = SyncMessage.FetchLatest.newBuilder();
+
+    switch (fetchType) {
+      case LOCAL_PROFILE:
+        fetchMessage.setType(SyncMessage.FetchLatest.Type.LOCAL_PROFILE);
+        break;
+      case STORAGE_MANIFEST:
+        fetchMessage.setType(SyncMessage.FetchLatest.Type.STORAGE_MANIFEST);
+        break;
+      default:
+        Log.w(TAG, "Unknown fetch type!");
+        break;
+    }
+
+    return container.setSyncMessage(syncMessage.setFetchLatest(fetchMessage)).build().toByteArray();
   }
 
   private byte[] createMultiDeviceVerifiedContent(VerifiedMessage verifiedMessage, byte[] nullMessage) {

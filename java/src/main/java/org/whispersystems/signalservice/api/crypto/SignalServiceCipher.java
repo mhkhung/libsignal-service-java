@@ -56,6 +56,7 @@ import org.whispersystems.signalservice.api.messages.calls.IceUpdateMessage;
 import org.whispersystems.signalservice.api.messages.calls.OfferMessage;
 import org.whispersystems.signalservice.api.messages.calls.SignalServiceCallMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.BlockedListMessage;
+import org.whispersystems.signalservice.api.messages.multidevice.ConfigurationMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.ContactsMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.ReadMessage;
 import org.whispersystems.signalservice.api.messages.multidevice.RequestMessage;
@@ -500,6 +501,52 @@ public class SignalServiceCipher {
       }
 
       return SignalServiceSyncMessage.forStickerPackOperations(operations);
+    }
+
+    if (content.hasBlocked()) {
+      List<String>               numbers   = content.getBlocked().getNumbersList();
+      List<String>               uuids     = content.getBlocked().getUuidsList();
+      List<SignalServiceAddress> addresses = new ArrayList<>(numbers.size() + uuids.size());
+      List<byte[]>               groupIds  = new ArrayList<>(content.getBlocked().getGroupIdsList().size());
+
+      for (String e164 : numbers) {
+        Optional<SignalServiceAddress> address = SignalServiceAddress.fromRaw(null, e164);
+        if (address.isPresent()) {
+          addresses.add(address.get());
+        }
+      }
+
+      for (String uuid : uuids) {
+        Optional<SignalServiceAddress> address = SignalServiceAddress.fromRaw(uuid, null);
+        if (address.isPresent()) {
+          addresses.add(address.get());
+        }
+      }
+
+      for (ByteString groupId : content.getBlocked().getGroupIdsList()) {
+        groupIds.add(groupId.toByteArray());
+      }
+
+      return SignalServiceSyncMessage.forBlocked(new BlockedListMessage(addresses, groupIds));
+    }
+
+    if (content.hasConfiguration()) {
+      Boolean readReceipts                   = content.getConfiguration().hasReadReceipts() ? content.getConfiguration().getReadReceipts() : null;
+      Boolean unidentifiedDeliveryIndicators = content.getConfiguration().hasUnidentifiedDeliveryIndicators() ? content.getConfiguration().getUnidentifiedDeliveryIndicators() : null;
+      Boolean typingIndicators               = content.getConfiguration().hasTypingIndicators() ? content.getConfiguration().getTypingIndicators() : null;
+      Boolean linkPreviews                   = content.getConfiguration().hasLinkPreviews() ? content.getConfiguration().getLinkPreviews() : null;
+
+      return SignalServiceSyncMessage.forConfiguration(new ConfigurationMessage(Optional.fromNullable(readReceipts),
+                                                                                Optional.fromNullable(unidentifiedDeliveryIndicators),
+                                                                                Optional.fromNullable(typingIndicators),
+                                                                                Optional.fromNullable(linkPreviews)));
+    }
+
+    if (content.hasFetchLatest() && content.getFetchLatest().hasType()) {
+      switch (content.getFetchLatest().getType()) {
+        case LOCAL_PROFILE:    return SignalServiceSyncMessage.forFetchLatest(SignalServiceSyncMessage.FetchType.LOCAL_PROFILE);
+        case STORAGE_MANIFEST: return SignalServiceSyncMessage.forFetchLatest(SignalServiceSyncMessage.FetchType.STORAGE_MANIFEST);
+      }
     }
 
     return SignalServiceSyncMessage.empty();
