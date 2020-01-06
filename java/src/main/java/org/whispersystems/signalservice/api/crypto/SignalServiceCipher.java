@@ -440,20 +440,6 @@ public class SignalServiceCipher {
       );
     }
 
-    if(content.hasBlocked()) {
-      Blocked blocked = content.getBlocked();
-      List<byte[]> blockedGroupIds = new ArrayList<>(blocked.getGroupIdsCount());
-      for (ByteString groupId : blocked.getGroupIdsList()) {
-        blockedGroupIds.add(groupId.toByteArray());
-      }
-      List<SignalServiceAddress> blockedAddresses = new ArrayList<>(blocked.getNumbersCount());
-      for (String e164 : blocked.getNumbersList()) {
-        blockedAddresses.add(new SignalServiceAddress(null, e164));
-      }
-      BlockedListMessage message = new BlockedListMessage(blockedAddresses, blockedGroupIds);
-      return SignalServiceSyncMessage.forBlocked(message);
-    }
-
     if (content.hasVerified()) {
       if (SignalServiceAddress.isValidAddress(content.getVerified().getDestinationUuid(), content.getVerified().getDestinationE164())) {
         try {
