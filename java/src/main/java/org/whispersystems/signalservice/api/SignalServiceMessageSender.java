@@ -144,26 +144,26 @@ public class SignalServiceMessageSender {
   public SignalServiceMessageSender(SignalServiceConfiguration urls,
                                     UUID uuid, String e164, String password,
                                     SignalProtocolStore store,
-                                    String userAgent,
+                                    String signalAgent,
                                     boolean isMultiDevice,
                                     Optional<SignalServiceMessagePipe> pipe,
                                     Optional<SignalServiceMessagePipe> unidentifiedPipe,
                                     Optional<EventListener> eventListener)
   {
-    this(urls, new StaticCredentialsProvider(uuid, e164, password, null, SignalServiceAddress.DEFAULT_DEVICE_ID), store, userAgent, isMultiDevice, pipe, unidentifiedPipe, eventListener);
+    this(urls, new StaticCredentialsProvider(uuid, e164, password, null, SignalServiceAddress.DEFAULT_DEVICE_ID), store, signalAgent, isMultiDevice, pipe, unidentifiedPipe, eventListener);
   }
 
   public SignalServiceMessageSender(SignalServiceConfiguration urls,
                                     CredentialsProvider credentialsProvider,
                                     SignalProtocolStore store,
-                                    String userAgent,
+                                    String signalAgent,
                                     boolean isMultiDevice,
                                     Optional<SignalServiceMessagePipe> pipe,
                                     Optional<SignalServiceMessagePipe> unidentifiedPipe,
                                     Optional<EventListener> eventListener)
   {
     this.credentialsProvider = credentialsProvider;
-    this.socket           = new PushServiceSocket(urls, credentialsProvider, userAgent);
+    this.socket           = new PushServiceSocket(urls, credentialsProvider, signalAgent);
     this.store            = store;
     this.localAddress     = new SignalServiceAddress(credentialsProvider.getUuid(), credentialsProvider.getE164());
     this.pipe             = new AtomicReference<>(pipe);
@@ -370,7 +370,8 @@ public class SignalServiceMessageSender {
                                                                  dataStream,
                                                                  ciphertextLength,
                                                                  new AttachmentCipherOutputStreamFactory(attachmentKey),
-                                                                 attachment.getListener());
+                                                                 attachment.getListener(),
+                                                                 attachment.getCancelationSignal());
 
     AttachmentUploadAttributes uploadAttributes = null;
 
@@ -570,6 +571,24 @@ public class SignalServiceMessageSender {
     if (message.isViewOnce()) {
       builder.setIsViewOnce(message.isViewOnce());
       builder.setRequiredProtocolVersion(Math.max(DataMessage.ProtocolVersion.VIEW_ONCE_VIDEO_VALUE, builder.getRequiredProtocolVersion()));
+    }
+
+    if (message.getReaction().isPresent()) {
+      DataMessage.Reaction.Builder reactionBuilder = DataMessage.Reaction.newBuilder()
+                                                                         .setEmoji(message.getReaction().get().getEmoji())
+                                                                         .setRemove(message.getReaction().get().isRemove())
+                                                                         .setTargetSentTimestamp(message.getReaction().get().getTargetSentTimestamp());
+
+      if (message.getReaction().get().getTargetAuthor().getNumber().isPresent()) {
+        reactionBuilder.setTargetAuthorE164(message.getReaction().get().getTargetAuthor().getNumber().get());
+      }
+
+      if (message.getReaction().get().getTargetAuthor().getUuid().isPresent()) {
+        reactionBuilder.setTargetAuthorUuid(message.getReaction().get().getTargetAuthor().getUuid().get().toString());
+      }
+
+      builder.setReaction(reactionBuilder.build());
+      builder.setRequiredProtocolVersion(Math.max(DataMessage.ProtocolVersion.REACTIONS_VALUE, builder.getRequiredProtocolVersion()));
     }
 
     builder.setTimestamp(message.getTimestamp());

@@ -32,6 +32,10 @@ public class RequestMessage {
     return request.getType() == Request.Type.CONFIGURATION;
   }
 
+  public boolean isKeysRequest() {
+    return request.getType() == Request.Type.KEYS;
+  }
+
   public Request getRequest() {
     return request;
   }

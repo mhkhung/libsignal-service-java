@@ -10,7 +10,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Collection;
@@ -71,13 +70,9 @@ public class Util {
   }
 
   public static byte[] getSecretBytes(int size) {
-    try {
-      byte[] secret = new byte[size];
-      SecureRandom.getInstance("SHA1PRNG").nextBytes(secret);
-      return secret;
-    } catch (NoSuchAlgorithmException e) {
-      throw new AssertionError(e);
-    }
+    byte[] secret = new byte[size];
+    new SecureRandom().nextBytes(secret);
+    return secret;
   }
 
   public static byte[] getRandomLengthBytes(int maxSize) {
@@ -87,7 +82,7 @@ public class Util {
     return result;
   }
 
-  public static String readFully(InputStream in) throws IOException {
+  public static byte[] readFullyAsBytes(InputStream in) throws IOException {
     ByteArrayOutputStream bout = new ByteArrayOutputStream();
     byte[] buffer              = new byte[4096];
     int read;
@@ -98,7 +93,11 @@ public class Util {
 
     in.close();
 
-    return new String(bout.toByteArray());
+    return bout.toByteArray();
+  }
+
+  public static String readFully(InputStream in) throws IOException {
+    return new String(readFullyAsBytes(in));
   }
 
   public static void readFully(InputStream in, byte[] buffer) throws IOException {

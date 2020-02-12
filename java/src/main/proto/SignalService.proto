@@ -176,6 +176,14 @@ message DataMessage {
     optional AttachmentPointer data      = 4;
   }
 
+  message Reaction {
+    optional string emoji               = 1;
+    optional bool   remove              = 2;
+    optional string targetAuthorE164    = 3;
+    optional string targetAuthorUuid    = 4;
+    optional uint64 targetSentTimestamp = 5;
+  }
+
   enum ProtocolVersion {
     option allow_alias = true;
 
@@ -183,7 +191,8 @@ message DataMessage {
     MESSAGE_TIMERS  = 1;
     VIEW_ONCE       = 2;
     VIEW_ONCE_VIDEO = 3;
-    CURRENT         = 3;
+    REACTIONS       = 4;
+    CURRENT         = 4;
   }
 
   optional string             body                    = 1;
@@ -199,6 +208,7 @@ message DataMessage {
   optional Sticker            sticker                 = 11;
   optional uint32             requiredProtocolVersion = 12;
   optional bool               isViewOnce              = 14;
+  optional Reaction           reaction                = 16;
 }
 
 message NullMessage {
@@ -279,6 +289,7 @@ message SyncMessage {
       GROUPS        = 2;
       BLOCKED       = 3;
       CONFIGURATION = 4;
+      KEYS          = 5;
     }
 
     optional Type type = 1;
@@ -315,7 +326,6 @@ message SyncMessage {
     optional uint64 timestamp  = 2;
   }
 
-
   message FetchLatest {
     enum Type {
       UNKNOWN          = 0;
@@ -326,6 +336,9 @@ message SyncMessage {
     optional Type type = 1;
   }
 
+  message Keys {
+    optional bytes storageService = 1;
+  }
 
   optional Sent                 sent                 = 1;
   optional Contacts             contacts             = 2;
@@ -339,6 +352,7 @@ message SyncMessage {
   repeated StickerPackOperation stickerPackOperation = 10;
   optional ViewOnceOpen         viewOnceOpen         = 11;
   optional FetchLatest          fetchLatest          = 12;
+  optional Keys                 keys                 = 13;
 }
 
 message AttachmentPointer {
@@ -388,15 +402,17 @@ message ContactDetails {
     optional uint32 length      = 2;
   }
 
-  optional string   number      = 1;
-  optional string   uuid        = 9;
-  optional string   name        = 2;
-  optional Avatar   avatar      = 3;
-  optional string   color       = 4;
-  optional Verified verified    = 5;
-  optional bytes    profileKey  = 6;
-  optional bool     blocked     = 7;
-  optional uint32   expireTimer = 8;
+  optional string   number        = 1;
+  optional string   uuid          = 9;
+  optional string   name          = 2;
+  optional Avatar   avatar        = 3;
+  optional string   color         = 4;
+  optional Verified verified      = 5;
+  optional bytes    profileKey    = 6;
+  optional bool     blocked       = 7;
+  optional uint32   expireTimer   = 8;
+  optional uint32   inboxPosition = 10;
+  optional bool     archived      = 11;
 }
 
 message GroupDetails {
@@ -410,13 +426,15 @@ message GroupDetails {
     optional string e164 = 2;
   }
 
-  optional bytes  id          = 1;
-  optional string name        = 2;
-  repeated string membersE164 = 3;
-  repeated Member members     = 9;
-  optional Avatar avatar      = 4;
-  optional bool   active      = 5 [default = true];
-  optional uint32 expireTimer = 6;
-  optional string color       = 7;
-  optional bool   blocked     = 8;
+  optional bytes  id            = 1;
+  optional string name          = 2;
+  repeated string membersE164   = 3;
+  repeated Member members       = 9;
+  optional Avatar avatar        = 4;
+  optional bool   active        = 5 [default = true];
+  optional uint32 expireTimer   = 6;
+  optional string color         = 7;
+  optional bool   blocked       = 8;
+  optional uint32 inboxPosition = 10;
+  optional bool   archived      = 11;
 }

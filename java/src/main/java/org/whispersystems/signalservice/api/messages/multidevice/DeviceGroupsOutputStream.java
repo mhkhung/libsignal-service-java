@@ -9,7 +9,6 @@ package org.whispersystems.signalservice.api.messages.multidevice;
 import com.google.protobuf.ByteString;
 
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
-import org.whispersystems.signalservice.internal.push.SignalServiceProtos;
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos.GroupDetails;
 
 import java.io.IOException;
@@ -83,6 +82,11 @@ public class DeviceGroupsOutputStream extends ChunkedOutputStream {
     groupDetails.addAllMembersE164(membersE164);
     groupDetails.setActive(group.isActive());
     groupDetails.setBlocked(group.isBlocked());
+    groupDetails.setArchived(group.isArchived());
+
+    if (group.getInboxPosition().isPresent()) {
+      groupDetails.setInboxPosition(group.getInboxPosition().get());
+    }
 
     byte[] serializedContactDetails = groupDetails.build().toByteArray();
 

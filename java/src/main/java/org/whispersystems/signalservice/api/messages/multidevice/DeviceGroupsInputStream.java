@@ -10,7 +10,6 @@ import org.whispersystems.libsignal.util.guava.Optional;
 import org.whispersystems.signalservice.api.messages.SignalServiceAttachmentStream;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.api.util.UuidUtil;
-import org.whispersystems.signalservice.internal.push.SignalServiceProtos;
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos.GroupDetails;
 import org.whispersystems.signalservice.internal.util.Util;
 
@@ -47,13 +46,15 @@ public class DeviceGroupsInputStream extends ChunkedInputStream{
     Optional<Integer>                       expirationTimer = Optional.absent();
     Optional<String>                        color           = Optional.fromNullable(details.getColor());
     boolean                                 blocked         = details.getBlocked();
+    Optional<Integer>                       inboxPosition   = Optional.absent();
+    boolean                                 archived        = false;
 
     if (details.hasAvatar()) {
       long        avatarLength      = details.getAvatar().getLength();
       InputStream avatarStream      = new ChunkedInputStream.LimitedInputStream(in, avatarLength);
       String      avatarContentType = details.getAvatar().getContentType();
 
-      avatar = Optional.of(new SignalServiceAttachmentStream(avatarStream, avatarContentType, avatarLength, Optional.<String>absent(), false, null));
+      avatar = Optional.of(new SignalServiceAttachmentStream(avatarStream, avatarContentType, avatarLength, Optional.<String>absent(), false, null, null));
     }
 
     if (details.hasExpireTimer() && details.getExpireTimer() > 0) {
@@ -69,7 +70,15 @@ public class DeviceGroupsInputStream extends ChunkedInputStream{
       }
     }
 
-    return new DeviceGroup(id, name, addressMembers, avatar, active, expirationTimer, color, blocked);
+    if (details.hasInboxPosition()) {
+      inboxPosition = Optional.of(details.getInboxPosition());
+    }
+
+    if (details.hasArchived()) {
+      archived = details.getArchived();
+    }
+
+    return new DeviceGroup(id, name, addressMembers, avatar, active, expirationTimer, color, blocked, inboxPosition, archived);
   }
 
 }

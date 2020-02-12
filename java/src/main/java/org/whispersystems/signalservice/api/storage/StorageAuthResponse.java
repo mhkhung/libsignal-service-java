@@ -1,8 +1,8 @@
-package org.whispersystems.signalservice.internal.push;
+package org.whispersystems.signalservice.api.storage;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class ContactDiscoveryCredentials {
+public class StorageAuthResponse {
 
   @JsonProperty
   private String username;
@@ -10,11 +10,10 @@ public class ContactDiscoveryCredentials {
   @JsonProperty
   private String password;
 
-  public void setUsername(String username) {
-    this.username = username;
-  }
+  public StorageAuthResponse() { }
 
-  public void setPassword(String password) {
+  public StorageAuthResponse(String username, String password) {
+    this.username = username;
     this.password = password;
   }
 

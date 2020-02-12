@@ -51,7 +51,7 @@ public class SignalServiceMessageReceiver {
   private final PushServiceSocket          socket;
   private final SignalServiceConfiguration urls;
   private final CredentialsProvider        credentialsProvider;
-  private final String                     userAgent;
+  private final String                     signalAgent;
   private final ConnectivityListener       connectivityListener;
   private final SleepTimer                 sleepTimer;
 
@@ -85,11 +85,11 @@ public class SignalServiceMessageReceiver {
    */
   public SignalServiceMessageReceiver(SignalServiceConfiguration urls,
                                       UUID uuid, String e164, String password,
-                                      String signalingKey, String userAgent,
+                                      String signalingKey, String signalAgent,
                                       ConnectivityListener listener,
                                       SleepTimer timer)
   {
-    this(urls, new StaticCredentialsProvider(uuid, e164, password, signalingKey, SignalServiceAddress.DEFAULT_DEVICE_ID), userAgent, listener, timer);
+    this(urls, new StaticCredentialsProvider(uuid, e164, password, signalingKey, SignalServiceAddress.DEFAULT_DEVICE_ID), signalAgent, listener, timer);
   }
 
   /**
@@ -100,14 +100,14 @@ public class SignalServiceMessageReceiver {
    */
   public SignalServiceMessageReceiver(SignalServiceConfiguration urls,
                                       CredentialsProvider credentials,
-                                      String userAgent,
+                                      String signalAgent,
                                       ConnectivityListener listener,
                                       SleepTimer timer)
   {
     this.urls                 = urls;
     this.credentialsProvider  = credentials;
-    this.socket               = new PushServiceSocket(urls, credentials, userAgent);
-    this.userAgent            = userAgent;
+    this.socket               = new PushServiceSocket(urls, credentials, signalAgent);
+    this.signalAgent          = signalAgent;
     this.connectivityListener = listener;
     this.sleepTimer           = timer;
   }
@@ -135,6 +135,12 @@ public class SignalServiceMessageReceiver {
     return socket.retrieveProfile(address, unidentifiedAccess);
   }
 
+  public SignalServiceProfile retrieveProfileByUsername(String username, Optional<UnidentifiedAccess> unidentifiedAccess)
+      throws IOException
+  {
+    return socket.retrieveProfileByUsername(username, unidentifiedAccess);
+  }
+
   public InputStream retrieveProfileAvatar(String path, File destination, byte[] profileKey, int maxSizeBytes)
     throws IOException
   {
@@ -147,7 +153,8 @@ public class SignalServiceMessageReceiver {
    *
    * @param pointer The {@link SignalServiceAttachmentPointer}
    *                received in a {@link SignalServiceDataMessage}.
-   * @param destination The download destination for this attachment.
+   * @param destination The download destination for this attachment. If this file exists, it is
+   *                    assumed that this is previously-downloaded content that can be resumed.
    * @param listener An optional listener (may be null) to receive callbacks on download progress.
    *
    * @return An InputStream that streams the plaintext attachment contents.
@@ -211,8 +218,9 @@ public class SignalServiceMessageReceiver {
   public SignalServiceMessagePipe createMessagePipe() {
     WebSocketConnection webSocket = new WebSocketConnection(urls.getSignalServiceUrls()[0].getUrl(),
                                                             urls.getSignalServiceUrls()[0].getTrustStore(),
-                                                            Optional.of(credentialsProvider), userAgent, connectivityListener,
-                                                            sleepTimer);
+                                                            Optional.of(credentialsProvider), signalAgent, connectivityListener,
+                                                            sleepTimer,
+                                                            urls.getNetworkInterceptors());
 
     return new SignalServiceMessagePipe(webSocket, Optional.of(credentialsProvider));
   }
@@ -220,8 +228,9 @@ public class SignalServiceMessageReceiver {
   public SignalServiceMessagePipe createUnidentifiedMessagePipe() {
     WebSocketConnection webSocket = new WebSocketConnection(urls.getSignalServiceUrls()[0].getUrl(),
                                                             urls.getSignalServiceUrls()[0].getTrustStore(),
-                                                            Optional.<CredentialsProvider>absent(), userAgent, connectivityListener,
-                                                            sleepTimer);
+                                                            Optional.<CredentialsProvider>absent(), signalAgent, connectivityListener,
+                                                            sleepTimer,
+                                                            urls.getNetworkInterceptors());
 
     return new SignalServiceMessagePipe(webSocket, Optional.of(credentialsProvider));
   }

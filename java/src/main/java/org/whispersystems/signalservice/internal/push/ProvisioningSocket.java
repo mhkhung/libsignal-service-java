@@ -1,7 +1,6 @@
 package org.whispersystems.signalservice.internal.push;
 
-import java.io.IOException;
-import java.util.concurrent.TimeoutException;
+import com.google.protobuf.ByteString;
 
 import org.whispersystems.libsignal.IdentityKeyPair;
 import org.whispersystems.libsignal.InvalidKeyException;
@@ -14,21 +13,22 @@ import org.whispersystems.signalservice.internal.push.ProvisioningProtos.Provisi
 import org.whispersystems.signalservice.internal.websocket.WebSocketConnection;
 import org.whispersystems.signalservice.internal.websocket.WebSocketProtos.WebSocketRequestMessage;
 
-import com.google.protobuf.ByteString;
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 public class ProvisioningSocket {
-  
+
   private WebSocketConnection connection;
   private boolean connected = false;
 
   public ProvisioningSocket(SignalServiceConfiguration signalServiceConfiguration, String userAgent,
-                                      SleepTimer timer) {
+                            SleepTimer timer) {
     // TODO uses first url, like in SignalServiceMessageReceiver
     // TODO should probably make this random, like in PushServiceSocket
     SignalServiceUrl[] serviceUrls = signalServiceConfiguration.getSignalServiceUrls();
-    connection = new WebSocketConnection(serviceUrls[0].getUrl(), serviceUrls[0].getTrustStore(), userAgent, null, timer);
+    connection = new WebSocketConnection(serviceUrls[0].getUrl(), serviceUrls[0].getTrustStore(), userAgent, null, timer, signalServiceConfiguration.getNetworkInterceptors());
   }
-  
+
   public ProvisioningUuid getProvisioningUuid() throws TimeoutException, IOException {
     if(!connected) {
       connection.connect();
@@ -38,7 +38,7 @@ public class ProvisioningSocket {
     ProvisioningUuid msg = ProvisioningUuid.parseFrom(bytes);
     return msg;
   }
-  
+
   public ProvisionMessage getProvisioningMessage(IdentityKeyPair tempIdentity) throws TimeoutException, IOException {
     if(!connected) {
       throw new IllegalStateException("No UUID requested yet!");
@@ -54,7 +54,7 @@ public class ProvisioningSocket {
       throw new AssertionError(e);
     }
   }
-  
+
   private ByteString readRequest() throws TimeoutException, IOException {
     WebSocketRequestMessage response = connection.readRequest(100000);
     ByteString bytes = response.getBody();
