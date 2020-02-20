@@ -1,1 +1,4 @@
 include ':java', ':android'
+
+include ':zkgroups'
+project(':zkgroups').projectDir = file('zkgroups-api')
