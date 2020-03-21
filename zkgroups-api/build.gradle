@@ -1,63 +1,15 @@
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-        jcenter {
-            content {
-                includeVersion 'org.jetbrains.trove4j', 'trove4j', '20160824'
-            }
-        }
-    }
-
-    dependencies {
-        classpath 'com.android.tools.build:gradle:3.5.1'
-    }
-}
-
-apply plugin: 'com.android.library'
+apply plugin: 'java-library'
 apply plugin: 'maven'
 apply plugin: 'signing'
 
-archivesBaseName = "signal-service-android"
-version          = lib_signal_service_version_number
-group            = lib_signal_service_group_info
+sourceCompatibility = 1.7
+archivesBaseName    = "zkgroups"
+version             = lib_signal_service_version_number
+group               = lib_signal_service_group_info
 
 repositories {
-    google()
     mavenCentral()
     mavenLocal()
-    jcenter {
-        content {
-            includeVersion 'org.jetbrains.trove4j', 'trove4j', '20160824'
-        }
-    }
-}
-
-dependencies {
-    implementation "org.signal:signal-metadata-android:${lib_signal_metadata_version}"
-    api (project(':libsignal-service')) {
-        exclude group: 'org.signal', module: 'signal-metadata-java'
-        exclude group: 'org.apache.httpcomponents', module: 'httpclient'
-    }
-}
-
-android {
-    compileSdkVersion 28
-    buildToolsVersion '28.0.3'
-
-    defaultConfig {
-        minSdkVersion 19
-        targetSdkVersion 28
-    }
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_7
-        targetCompatibility JavaVersion.VERSION_1_7
-    }
-    lintOptions {
-        warning 'InvalidPackage'
-        abortOnError false
-    }
 }
 
 tasks.whenTaskAdded { task ->
@@ -83,7 +35,6 @@ def getRepositoryPassword() {
     return hasProperty('whisperSonatypePassword') ? whisperSonatypePassword : ""
 }
 
-
 signing {
     required { isReleaseBuild() && gradle.taskGraph.hasTask("uploadArchives") }
     sign configurations.archives
@@ -99,9 +50,9 @@ uploadArchives {
         }
 
         pom.project {
-            name 'signal-service-android'
-            packaging 'aar'
-            description 'Signal Service communication library for Android, unofficial fork'
+            name archivesBaseName
+            packaging 'jar'
+            description 'Signal zkgroups library for Java, unofficial fork'
             url 'https://github.com/Turasa/libsignal-service-java'
 
             scm {
@@ -143,3 +94,17 @@ task installArchives(type: Upload) {
     }
 }
 
+task packageJavadoc(type: Jar, dependsOn: 'javadoc') {
+    from javadoc.destinationDir
+    classifier = 'javadoc'
+}
+
+task packageSources(type: Jar) {
+    from sourceSets.main.allSource
+    classifier = 'sources'
+}
+
+artifacts {
+    archives packageJavadoc
+    archives packageSources
+}
