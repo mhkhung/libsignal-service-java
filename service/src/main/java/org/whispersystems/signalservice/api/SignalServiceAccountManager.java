@@ -20,14 +20,11 @@ import org.whispersystems.libsignal.logging.Log;
 import org.whispersystems.libsignal.state.PreKeyRecord;
 import org.whispersystems.libsignal.state.SignedPreKeyRecord;
 import org.whispersystems.libsignal.util.ByteUtil;
-import org.whispersystems.libsignal.util.Pair;
 import org.whispersystems.libsignal.util.guava.Optional;
 import org.whispersystems.signalservice.FeatureFlags;
 import org.whispersystems.signalservice.api.crypto.InvalidCiphertextException;
 import org.whispersystems.signalservice.api.crypto.ProfileCipher;
 import org.whispersystems.signalservice.api.crypto.ProfileCipherOutputStream;
-import org.whispersystems.signalservice.api.push.exceptions.NoContentException;
-import org.whispersystems.signalservice.api.storage.StorageKey;
 import org.whispersystems.signalservice.api.messages.calls.TurnServerInfo;
 import org.whispersystems.signalservice.api.messages.multidevice.DeviceInfo;
 import org.whispersystems.signalservice.api.profiles.SignalServiceProfile;
@@ -35,14 +32,17 @@ import org.whispersystems.signalservice.api.profiles.SignalServiceProfileWrite;
 import org.whispersystems.signalservice.api.push.ContactTokenDetails;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.api.push.SignedPreKeyEntity;
+import org.whispersystems.signalservice.api.push.exceptions.NoContentException;
 import org.whispersystems.signalservice.api.push.exceptions.NotFoundException;
 import org.whispersystems.signalservice.api.storage.SignalStorageCipher;
 import org.whispersystems.signalservice.api.storage.SignalStorageManifest;
 import org.whispersystems.signalservice.api.storage.SignalStorageModels;
 import org.whispersystems.signalservice.api.storage.SignalStorageRecord;
+import org.whispersystems.signalservice.api.storage.StorageKey;
 import org.whispersystems.signalservice.api.storage.StorageManifestKey;
 import org.whispersystems.signalservice.api.util.SleepTimer;
 import org.whispersystems.signalservice.api.util.StreamDetails;
+import org.whispersystems.signalservice.api.util.UuidUtil;
 import org.whispersystems.signalservice.internal.configuration.SignalServiceConfiguration;
 import org.whispersystems.signalservice.internal.contacts.crypto.ContactDiscoveryCipher;
 import org.whispersystems.signalservice.internal.contacts.crypto.Quote;
@@ -614,6 +614,10 @@ public class SignalServiceAccountManager {
   public NewDeviceRegistrationReturn finishNewDeviceRegistration(IdentityKeyPair tempIdentity, String signalingKey, boolean supportsSms, boolean fetchesMessages, int registrationId, String deviceName) throws TimeoutException, IOException, InvalidKeyException {
     ProvisionMessage msg = provisioningSocket.getProvisioningMessage(tempIdentity);
     credentialsProvider.setE164(msg.getNumber());
+    UUID uuid = UuidUtil.parseOrNull(msg.getUuid());
+    // Not setting Uuid here, as that causes a 400 Bad Request
+    // when calling the finishNewDeviceRegistration endpoint
+    // credentialsProvider.setUuid(uuid);
     String provisioningCode = msg.getProvisioningCode();
     byte[] publicKeyBytes = msg.getIdentityKeyPublic().toByteArray();
     if (publicKeyBytes.length == 32) {
@@ -628,7 +632,7 @@ public class SignalServiceAccountManager {
     IdentityKeyPair identity = new IdentityKeyPair(new IdentityKey(publicKey), privateKey);
     int deviceId = this.pushServiceSocket.finishNewDeviceRegistration(provisioningCode, signalingKey, supportsSms, fetchesMessages, registrationId, deviceName);
     credentialsProvider.setDeviceId(deviceId);
-    return new NewDeviceRegistrationReturn(identity, deviceId, msg.getNumber(), msg.hasProfileKey() ? msg.getProfileKey().toByteArray() : null, msg.hasReadReceipts() && msg.getReadReceipts());
+    return new NewDeviceRegistrationReturn(identity, deviceId, msg.getNumber(), uuid, msg.hasProfileKey() ? msg.getProfileKey().toByteArray() : null, msg.hasReadReceipts() && msg.getReadReceipts());
   }
 
   public void addDevice(String deviceIdentifier,
@@ -782,18 +786,20 @@ public class SignalServiceAccountManager {
   /**
    * Helper class for holding the returns of finishNewDeviceRegistration()
    */
-  public class NewDeviceRegistrationReturn {
+  public static class NewDeviceRegistrationReturn {
     private final IdentityKeyPair identity;
-    private final int deviceId;
-    private final String number;
-    private final byte[] profileKey;
-    private final boolean readReceipts;
-    
-    NewDeviceRegistrationReturn(IdentityKeyPair identity, int deviceId, String number, byte[] profileKey, boolean readReceipts) {
-      this.identity = identity;
-      this.deviceId = deviceId;
-      this.number = number;
-      this.profileKey = profileKey;
+    private final int             deviceId;
+    private final String          number;
+    private final UUID            uuid;
+    private final byte[]          profileKey;
+    private final boolean         readReceipts;
+
+    NewDeviceRegistrationReturn(IdentityKeyPair identity, int deviceId, String number, UUID uuid, byte[] profileKey, boolean readReceipts) {
+      this.identity     = identity;
+      this.deviceId     = deviceId;
+      this.number       = number;
+      this.uuid         = uuid;
+      this.profileKey   = profileKey;
       this.readReceipts = readReceipts;
     }
 
@@ -819,6 +825,13 @@ public class SignalServiceAccountManager {
     }
 
     /**
+     * @return The account's uuid
+     */
+    public UUID getUuid() {
+      return uuid;
+    }
+
+    /**
      * @return The account's profile key or null
      */
     public byte[] getProfileKey() {
@@ -832,6 +845,4 @@ public class SignalServiceAccountManager {
       return readReceipts;
     }
   }
-
-
 }

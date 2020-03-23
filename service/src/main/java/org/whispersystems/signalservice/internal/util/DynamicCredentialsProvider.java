@@ -23,7 +23,7 @@ public class DynamicCredentialsProvider implements CredentialsProvider {
 
   @Override
   public UUID getUuid() {
-    return null;
+    return uuid;
   }
 
   public void setUuid(UUID uuid) {
