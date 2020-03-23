@@ -30,6 +30,7 @@ import org.whispersystems.signalservice.api.messages.SignalServiceDataMessage;
 import org.whispersystems.signalservice.api.messages.SignalServiceGroup;
 import org.whispersystems.signalservice.api.messages.SignalServiceReceiptMessage;
 import org.whispersystems.signalservice.api.messages.SignalServiceStickerManifest;
+import org.whispersystems.signalservice.api.messages.SignalServiceStickerManifestUpload;
 import org.whispersystems.signalservice.api.messages.SignalServiceTypingMessage;
 import org.whispersystems.signalservice.api.messages.calls.AnswerMessage;
 import org.whispersystems.signalservice.api.messages.calls.IceUpdateMessage;
@@ -90,9 +91,11 @@ import java.io.InputStream;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -418,23 +421,68 @@ public class SignalServiceMessageSender {
                                               attachment.getBlurHash());
   }
 
-  public Pair<byte[], StickerUploadAttributesResponse> getStickerUploadAttributes(int stickerCount) throws IOException {
-    return new Pair<>(Util.getSecretBytes(32), socket.getStickerUploadAttributes(stickerCount));
-  }
-
-  public void uploadStickerManifest(SignalServiceStickerManifest manifest, byte[] packKey, StickerUploadAttributes manifestUploadAttributes)
+  /**
+   * Upload the sticker pack specified in the manifest.
+   * Stickers are in webp format.
+   * Maximum size for a sticker is 100KiB.
+   *
+   * @param manifest Specifies the name, stickers and cover for the sticker pack.
+   * @param packKey  Needs to be an array of 64 random bytes
+   * @return the packId of the successfully uploaded sticker pack
+   */
+  public String uploadStickerManifest(SignalServiceStickerManifestUpload manifest, byte[] packKey)
       throws NonSuccessfulResponseCodeException, PushNetworkException
   {
     if (manifest.getStickers().isEmpty()) {
       throw new AssertionError("Must have stickers!");
     }
+    if (packKey.length != 64) {
+      throw new AssertionError("Size of packKey must be 64!");
+    }
 
-    byte[] content     = createStickerManifestContent(manifest);
+    int stickerCount = manifest.getStickers().size() + (manifest.getCover().isPresent() ? 1 : 0);
+
+    StickerUploadAttributesResponse stickerUploadAttributes = socket.getStickerUploadAttributes(stickerCount);
+
+    byte[] content     = createStickerManifestContent(manifest.toManifest());
     byte[] expandedKey = new HKDFv3().deriveSecrets(packKey, "Sticker Pack".getBytes(), 64);
-    socket.uploadStickerContent(new ByteArrayInputStream(content), content.length, expandedKey, manifestUploadAttributes);
+    socket.uploadStickerContent(new ByteArrayInputStream(content), content.length, expandedKey, stickerUploadAttributes.getManifest());
+
+    Map<Integer, StickerUploadAttributes> stickerUploadAttributesById = new HashMap<>();
+    for (StickerUploadAttributes attr : stickerUploadAttributes.getStickers()) {
+      stickerUploadAttributesById.put(attr.getId(), attr);
+    }
+
+    List<SignalServiceStickerManifestUpload.StickerInfo> stickerUploads = new ArrayList<>(manifest.getStickers());
+    if (manifest.getCover().isPresent()) {
+      final SignalServiceStickerManifestUpload.StickerInfo cover = manifest.getCover().get();
+      stickerUploads.add(cover);
+    }
+
+    uploadStickers(stickerUploads, packKey, stickerUploadAttributesById);
+
+    return stickerUploadAttributes.getPackId();
   }
 
-  public void uploadSticker(InputStream data, long length, byte[] packKey, StickerUploadAttributes stickerUploadAttributes)
+  private void uploadStickers(List<SignalServiceStickerManifestUpload.StickerInfo> stickers, byte[] packKey, Map<Integer, StickerUploadAttributes> stickerUploadAttributes)
+      throws NonSuccessfulResponseCodeException, PushNetworkException
+  {
+    if (stickers.size() != stickerUploadAttributes.size()) {
+      throw new AssertionError("Size of sickers and upload attributes must be the same.");
+    }
+
+    int i = 0;
+    for (SignalServiceStickerManifestUpload.StickerInfo sticker : stickers) {
+      StickerUploadAttributes uploadAttributes = stickerUploadAttributes.get(i);
+      if (uploadAttributes == null) {
+        throw new AssertionError("Upload attributes missing for sticker id: " + i);
+      }
+      uploadSticker(sticker.getInputStream(), sticker.getLength(), packKey, uploadAttributes);
+      i++;
+    }
+  }
+
+  private void uploadSticker(InputStream data, long length, byte[] packKey, StickerUploadAttributes stickerUploadAttributes)
       throws NonSuccessfulResponseCodeException, PushNetworkException
   {
     byte[] expandedKey = new HKDFv3().deriveSecrets(packKey, "Sticker Pack".getBytes(), 64);
