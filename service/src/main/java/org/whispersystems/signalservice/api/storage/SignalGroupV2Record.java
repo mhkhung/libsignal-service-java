@@ -2,20 +2,27 @@ package org.whispersystems.signalservice.api.storage;
 
 import com.google.protobuf.ByteString;
 
+import org.signal.zkgroup.InvalidInputException;
+import org.signal.zkgroup.groups.GroupMasterKey;
 import org.whispersystems.signalservice.internal.storage.protos.GroupV1Record;
+import org.whispersystems.signalservice.internal.storage.protos.GroupV2Record;
 
 import java.util.Objects;
 
-public final class SignalGroupV1Record implements SignalRecord {
+public final class SignalGroupV2Record implements SignalRecord {
 
-  private final StorageId     id;
-  private final GroupV1Record proto;
-  private final byte[]        groupId;
+  private final StorageId      id;
+  private final GroupV2Record  proto;
+  private final GroupMasterKey masterKey;
 
-  public SignalGroupV1Record(StorageId id, GroupV1Record proto) {
-    this.id      = id;
-    this.proto   = proto;
-    this.groupId = proto.getId().toByteArray();
+  public SignalGroupV2Record(StorageId id, GroupV2Record proto) {
+    this.id        = id;
+    this.proto     = proto;
+    try {
+      this.masterKey = new GroupMasterKey(proto.getMasterKey().toByteArray());
+    } catch (InvalidInputException e) {
+      throw new AssertionError(e);
+    }
   }
 
   @Override
@@ -23,8 +30,8 @@ public final class SignalGroupV1Record implements SignalRecord {
     return id;
   }
 
-  public byte[] getGroupId() {
-    return groupId;
+  public GroupMasterKey getMasterKey() {
+    return masterKey;
   }
 
   public boolean isBlocked() {
@@ -39,7 +46,7 @@ public final class SignalGroupV1Record implements SignalRecord {
     return proto.getArchived();
   }
 
-  GroupV1Record toProto() {
+  GroupV2Record toProto() {
     return proto;
   }
 
@@ -47,7 +54,7 @@ public final class SignalGroupV1Record implements SignalRecord {
   public boolean equals(Object o) {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
-    SignalGroupV1Record that = (SignalGroupV1Record) o;
+    SignalGroupV2Record that = (SignalGroupV2Record) o;
     return id.equals(that.id) &&
         proto.equals(that.proto);
   }
@@ -59,13 +66,13 @@ public final class SignalGroupV1Record implements SignalRecord {
 
   public static final class Builder {
     private final StorageId             id;
-    private final GroupV1Record.Builder builder;
+    private final GroupV2Record.Builder builder;
 
-    public Builder(byte[] rawId, byte[] groupId) {
+    public Builder(byte[] rawId, GroupMasterKey masterKey) {
       this.id      = StorageId.forGroupV1(rawId);
-      this.builder = GroupV1Record.newBuilder();
+      this.builder = GroupV2Record.newBuilder();
 
-      builder.setId(ByteString.copyFrom(groupId));
+      builder.setMasterKey(ByteString.copyFrom(masterKey.serialize()));
     }
 
     public Builder setBlocked(boolean blocked) {
@@ -83,8 +90,8 @@ public final class SignalGroupV1Record implements SignalRecord {
       return this;
     }
 
-    public SignalGroupV1Record build() {
-      return new SignalGroupV1Record(id, builder.build());
+    public SignalGroupV2Record build() {
+      return new SignalGroupV2Record(id, builder.build());
     }
   }
 }
