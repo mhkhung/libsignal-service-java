@@ -1,4 +1,4 @@
-package org.whispersystems.signalservice.internal.groupsv2;
+package org.whispersystems.signalservice.api.groupsv2;
 
 import com.google.protobuf.ByteString;
 
@@ -30,6 +30,16 @@ public final class DecryptedGroupUtil {
   }
 
   public static ArrayList<UUID> toUuidList(Collection<DecryptedMember> membersList) {
+    ArrayList<UUID> uuidList = new ArrayList<>(membersList.size());
+
+    for (DecryptedMember member : membersList) {
+      uuidList.add(toUuid(member));
+    }
+
+    return uuidList;
+  }
+
+  public static ArrayList<UUID> membersToUuidList(Collection<DecryptedMember> membersList) {
     ArrayList<UUID> uuidList = new ArrayList<>(membersList.size());
 
     for (DecryptedMember member : membersList) {

@@ -4,6 +4,7 @@ import com.google.protobuf.ByteString;
 
 import org.whispersystems.libsignal.IdentityKeyPair;
 import org.whispersystems.libsignal.InvalidKeyException;
+import org.whispersystems.libsignal.util.guava.Optional;
 import org.whispersystems.signalservice.api.util.SleepTimer;
 import org.whispersystems.signalservice.internal.configuration.SignalServiceConfiguration;
 import org.whispersystems.signalservice.internal.configuration.SignalServiceUrl;
@@ -25,8 +26,9 @@ public class ProvisioningSocket {
                             SleepTimer timer) {
     // TODO uses first url, like in SignalServiceMessageReceiver
     // TODO should probably make this random, like in PushServiceSocket
+    // TODO pass dns as well
     SignalServiceUrl[] serviceUrls = signalServiceConfiguration.getSignalServiceUrls();
-    connection = new WebSocketConnection(serviceUrls[0].getUrl(), serviceUrls[0].getTrustStore(), userAgent, null, timer, signalServiceConfiguration.getNetworkInterceptors());
+    connection = new WebSocketConnection(serviceUrls[0].getUrl(), serviceUrls[0].getTrustStore(), userAgent, null, timer, signalServiceConfiguration.getNetworkInterceptors(), Optional.absent());
   }
 
   public ProvisioningUuid getProvisioningUuid() throws TimeoutException, IOException {

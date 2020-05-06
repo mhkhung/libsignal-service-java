@@ -41,6 +41,7 @@ import org.whispersystems.signalservice.api.util.UuidUtil;
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos;
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos.AttachmentPointer;
 import org.whispersystems.signalservice.internal.push.UnsupportedDataMessageException;
+import org.whispersystems.signalservice.internal.push.UnsupportedDataMessageProtocolVersionException;
 import org.whispersystems.signalservice.internal.serialize.SignalServiceAddressProtobufSerializer;
 import org.whispersystems.signalservice.internal.serialize.SignalServiceMetadataProtobufSerializer;
 import org.whispersystems.signalservice.internal.serialize.protos.SignalServiceContentProto;
@@ -60,6 +61,7 @@ public final class SignalServiceContent {
   private final SignalServiceAddress      sender;
   private final int                       senderDevice;
   private final long                      timestamp;
+  private final long                      serverTimestamp;
   private final boolean                   needsReceipt;
   private final SignalServiceContentProto serializedState;
 
@@ -69,10 +71,11 @@ public final class SignalServiceContent {
   private final Optional<SignalServiceReceiptMessage> readMessage;
   private final Optional<SignalServiceTypingMessage>  typingMessage;
 
-  private SignalServiceContent(SignalServiceDataMessage message, SignalServiceAddress sender, int senderDevice, long timestamp, boolean needsReceipt, SignalServiceContentProto serializedState) {
+  private SignalServiceContent(SignalServiceDataMessage message, SignalServiceAddress sender, int senderDevice, long timestamp, long serverTimestamp, boolean needsReceipt, SignalServiceContentProto serializedState) {
     this.sender          = sender;
     this.senderDevice    = senderDevice;
     this.timestamp       = timestamp;
+    this.serverTimestamp = serverTimestamp;
     this.needsReceipt    = needsReceipt;
     this.serializedState = serializedState;
 
@@ -83,10 +86,11 @@ public final class SignalServiceContent {
     this.typingMessage      = Optional.absent();
   }
 
-  private SignalServiceContent(SignalServiceSyncMessage synchronizeMessage, SignalServiceAddress sender, int senderDevice, long timestamp, boolean needsReceipt, SignalServiceContentProto serializedState) {
+  private SignalServiceContent(SignalServiceSyncMessage synchronizeMessage, SignalServiceAddress sender, int senderDevice, long timestamp, long serverTimestamp, boolean needsReceipt, SignalServiceContentProto serializedState) {
     this.sender          = sender;
     this.senderDevice    = senderDevice;
     this.timestamp       = timestamp;
+    this.serverTimestamp = serverTimestamp;
     this.needsReceipt    = needsReceipt;
     this.serializedState = serializedState;
 
@@ -97,10 +101,11 @@ public final class SignalServiceContent {
     this.typingMessage      = Optional.absent();
   }
 
-  private SignalServiceContent(SignalServiceCallMessage callMessage, SignalServiceAddress sender, int senderDevice, long timestamp, boolean needsReceipt, SignalServiceContentProto serializedState) {
+  private SignalServiceContent(SignalServiceCallMessage callMessage, SignalServiceAddress sender, int senderDevice, long timestamp, long serverTimestamp, boolean needsReceipt, SignalServiceContentProto serializedState) {
     this.sender          = sender;
     this.senderDevice    = senderDevice;
     this.timestamp       = timestamp;
+    this.serverTimestamp = serverTimestamp;
     this.needsReceipt    = needsReceipt;
     this.serializedState = serializedState;
 
@@ -111,10 +116,11 @@ public final class SignalServiceContent {
     this.typingMessage      = Optional.absent();
   }
 
-  private SignalServiceContent(SignalServiceReceiptMessage receiptMessage, SignalServiceAddress sender, int senderDevice, long timestamp, boolean needsReceipt, SignalServiceContentProto serializedState) {
+  private SignalServiceContent(SignalServiceReceiptMessage receiptMessage, SignalServiceAddress sender, int senderDevice, long timestamp, long serverTimestamp, boolean needsReceipt, SignalServiceContentProto serializedState) {
     this.sender          = sender;
     this.senderDevice    = senderDevice;
     this.timestamp       = timestamp;
+    this.serverTimestamp = serverTimestamp;
     this.needsReceipt    = needsReceipt;
     this.serializedState = serializedState;
 
@@ -125,10 +131,11 @@ public final class SignalServiceContent {
     this.typingMessage      = Optional.absent();
   }
 
-  private SignalServiceContent(SignalServiceTypingMessage typingMessage, SignalServiceAddress sender, int senderDevice, long timestamp, boolean needsReceipt, SignalServiceContentProto serializedState) {
+  private SignalServiceContent(SignalServiceTypingMessage typingMessage, SignalServiceAddress sender, int senderDevice, long timestamp, long serverTimestamp, boolean needsReceipt, SignalServiceContentProto serializedState) {
     this.sender          = sender;
     this.senderDevice    = senderDevice;
     this.timestamp       = timestamp;
+    this.serverTimestamp = serverTimestamp;
     this.needsReceipt    = needsReceipt;
     this.serializedState = serializedState;
 
@@ -171,6 +178,10 @@ public final class SignalServiceContent {
     return timestamp;
   }
 
+  public long getServerTimestamp() {
+    return serverTimestamp;
+  }
+
   public boolean isNeedsReceipt() {
     return needsReceipt;
   }
@@ -196,7 +207,7 @@ public final class SignalServiceContent {
    * Takes internal protobuf serialization format and processes it into a {@link SignalServiceContent}.
    */
   public static SignalServiceContent createFromProto(SignalServiceContentProto serviceContentProto)
-    throws ProtocolInvalidMessageException, ProtocolInvalidKeyException, UnsupportedDataMessageException
+      throws ProtocolInvalidMessageException, ProtocolInvalidKeyException, UnsupportedDataMessageException
   {
     SignalServiceMetadata metadata     = SignalServiceMetadataProtobufSerializer.fromProtobuf(serviceContentProto.getMetadata());
     SignalServiceAddress  localAddress = SignalServiceAddressProtobufSerializer.fromProtobuf(serviceContentProto.getLocalAddress());
@@ -208,6 +219,7 @@ public final class SignalServiceContent {
                                       metadata.getSender(),
                                       metadata.getSenderDevice(),
                                       metadata.getTimestamp(),
+                                      metadata.getServerTimestamp(),
                                       metadata.isNeedsReceipt(),
                                       serviceContentProto);
     } else if (serviceContentProto.getDataCase() == SignalServiceContentProto.DataCase.CONTENT) {
@@ -218,6 +230,7 @@ public final class SignalServiceContent {
                                         metadata.getSender(),
                                         metadata.getSenderDevice(),
                                         metadata.getTimestamp(),
+                                        metadata.getServerTimestamp(),
                                         metadata.isNeedsReceipt(),
                                         serviceContentProto);
       } else if (message.hasSyncMessage() && localAddress.matches(metadata.getSender())) {
@@ -225,6 +238,7 @@ public final class SignalServiceContent {
                                         metadata.getSender(),
                                         metadata.getSenderDevice(),
                                         metadata.getTimestamp(),
+                                        metadata.getServerTimestamp(),
                                         metadata.isNeedsReceipt(),
                                         serviceContentProto);
       } else if (message.hasCallMessage()) {
@@ -232,6 +246,7 @@ public final class SignalServiceContent {
                                         metadata.getSender(),
                                         metadata.getSenderDevice(),
                                         metadata.getTimestamp(),
+                                        metadata.getServerTimestamp(),
                                         metadata.isNeedsReceipt(),
                                         serviceContentProto);
       } else if (message.hasReceiptMessage()) {
@@ -239,6 +254,7 @@ public final class SignalServiceContent {
                                         metadata.getSender(),
                                         metadata.getSenderDevice(),
                                         metadata.getTimestamp(),
+                                        metadata.getServerTimestamp(),
                                         metadata.isNeedsReceipt(),
                                         serviceContentProto);
       } else if (message.hasTypingMessage()) {
@@ -246,6 +262,7 @@ public final class SignalServiceContent {
                                         metadata.getSender(),
                                         metadata.getSenderDevice(),
                                         metadata.getTimestamp(),
+                                        metadata.getServerTimestamp(),
                                         false,
                                         serviceContentProto);
       }
@@ -254,7 +271,8 @@ public final class SignalServiceContent {
     return null;
   }
 
-  private static SignalServiceDataMessage createSignalServiceMessage(SignalServiceMetadata metadata, SignalServiceProtos.DataMessage content)
+  private static SignalServiceDataMessage createSignalServiceMessage(SignalServiceMetadata metadata,
+                                                                     SignalServiceProtos.DataMessage content)
       throws ProtocolInvalidMessageException, UnsupportedDataMessageException
   {
     SignalServiceGroup                  groupInfoV1  = createGroupV1Info(content);
@@ -277,13 +295,14 @@ public final class SignalServiceContent {
     List<SignalServiceDataMessage.Preview> previews         = createPreviews(content);
     SignalServiceDataMessage.Sticker       sticker          = createSticker(content);
     SignalServiceDataMessage.Reaction      reaction         = createReaction(content);
+    SignalServiceDataMessage.RemoteDelete  remoteDelete     = createRemoteDelete(content);
 
-    if (content.getRequiredProtocolVersion() > SignalServiceProtos.DataMessage.ProtocolVersion.CURRENT.getNumber()) {
-      throw new UnsupportedDataMessageException(SignalServiceProtos.DataMessage.ProtocolVersion.CURRENT.getNumber(),
-                                                content.getRequiredProtocolVersion(),
-                                                metadata.getSender().getIdentifier(),
-                                                metadata.getSenderDevice(),
-                                                groupContext);
+    if (content.getRequiredProtocolVersion() > SignalServiceProtos.DataMessage.ProtocolVersion.CURRENT_VALUE) {
+      throw new UnsupportedDataMessageProtocolVersionException(SignalServiceProtos.DataMessage.ProtocolVersion.CURRENT_VALUE,
+                                                               content.getRequiredProtocolVersion(),
+                                                               metadata.getSender().getIdentifier(),
+                                                               metadata.getSenderDevice(),
+                                                               groupContext);
     }
 
     for (SignalServiceProtos.AttachmentPointer pointer : content.getAttachmentsList()) {
@@ -299,7 +318,7 @@ public final class SignalServiceContent {
     return new SignalServiceDataMessage(metadata.getTimestamp(),
                                         groupInfoV1, groupInfoV2,
                                         attachments,
-                                        content.getBody(),
+                                        content.hasBody() ? content.getBody() : null,
                                         endSession,
                                         content.getExpireTimer(),
                                         expirationUpdate,
@@ -310,10 +329,12 @@ public final class SignalServiceContent {
                                         previews,
                                         sticker,
                                         content.getIsViewOnce(),
-                                        reaction);
+                                        reaction,
+                                        remoteDelete);
   }
 
-  private static SignalServiceSyncMessage createSynchronizeMessage(SignalServiceMetadata metadata, SignalServiceProtos.SyncMessage content)
+  private static SignalServiceSyncMessage createSynchronizeMessage(SignalServiceMetadata metadata,
+                                                                   SignalServiceProtos.SyncMessage content)
       throws ProtocolInvalidMessageException, ProtocolInvalidKeyException, UnsupportedDataMessageException
   {
     if (content.hasSent()) {
@@ -509,7 +530,8 @@ public final class SignalServiceContent {
 
     if (content.hasContacts()) {
       AttachmentPointer pointer = content.getContacts().getBlob();
-      return SignalServiceSyncMessage.forContacts(new ContactsMessage(new SignalServiceAttachmentPointer(pointer.getId(),
+      return SignalServiceSyncMessage.forContacts(new ContactsMessage(new SignalServiceAttachmentPointer(pointer.getCdnNumber(),
+                      SignalServiceAttachmentRemoteId.from(pointer),
                       pointer.getContentType(), pointer.getKey().toByteArray(),
                       pointer.hasSize() ? Optional.of(pointer.getSize()) : Optional.<Integer>absent(),
                       pointer.hasThumbnail() ? Optional.of(pointer.getThumbnail().toByteArray()) : Optional.<byte[]>absent(),
@@ -519,7 +541,8 @@ public final class SignalServiceContent {
                       pointer.hasFileName() ? Optional.of(pointer.getFileName()) : Optional.<String>absent(),
                       (pointer.getFlags() & AttachmentPointer.Flags.VOICE_MESSAGE_VALUE) != 0,
                       pointer.hasCaption() ? Optional.of(pointer.getCaption()) : Optional.<String>absent(),
-                      pointer.hasBlurHash() ? Optional.of(pointer.getBlurHash()) : Optional.<String>absent()
+                      pointer.hasBlurHash() ? Optional.of(pointer.getBlurHash()) : Optional.<String>absent(),
+                      pointer.hasUploadTimestamp() ? pointer.getUploadTimestamp() : 0
               ), content.getContacts().hasComplete() && content.getContacts().getComplete()
               )
       );
@@ -527,7 +550,8 @@ public final class SignalServiceContent {
 
     if (content.hasGroups()) {
       AttachmentPointer pointer = content.getGroups().getBlob();
-      return SignalServiceSyncMessage.forGroups(new SignalServiceAttachmentPointer(pointer.getId(),
+      return SignalServiceSyncMessage.forGroups(new SignalServiceAttachmentPointer(pointer.getCdnNumber(),
+                      SignalServiceAttachmentRemoteId.from(pointer),
                       pointer.getContentType(), pointer.getKey().toByteArray(),
                       pointer.hasSize() ? Optional.of(pointer.getSize()) : Optional.<Integer>absent(),
                       pointer.hasThumbnail() ? Optional.of(pointer.getThumbnail().toByteArray()) : Optional.<byte[]>absent(),
@@ -537,7 +561,8 @@ public final class SignalServiceContent {
                       pointer.hasFileName() ? Optional.of(pointer.getFileName()) : Optional.<String>absent(),
                       (pointer.getFlags() & AttachmentPointer.Flags.VOICE_MESSAGE_VALUE) != 0,
                       pointer.hasCaption() ? Optional.of(pointer.getCaption()) : Optional.<String>absent(),
-                      pointer.hasBlurHash() ? Optional.of(pointer.getBlurHash()) : Optional.<String>absent()
+                      pointer.hasBlurHash() ? Optional.of(pointer.getBlurHash()) : Optional.<String>absent(),
+                      pointer.hasUploadTimestamp() ? pointer.getUploadTimestamp() : 0
               )
       );
     }
@@ -599,7 +624,7 @@ public final class SignalServiceContent {
                                                                  Optional.<byte[]>absent());
   }
 
-  private static SignalServiceDataMessage.Quote createQuote(SignalServiceProtos.DataMessage content) {
+  private static SignalServiceDataMessage.Quote createQuote(SignalServiceProtos.DataMessage content) throws ProtocolInvalidMessageException {
     if (!content.hasQuote()) return null;
 
     List<SignalServiceDataMessage.Quote.QuotedAttachment> attachments = new LinkedList<>();
@@ -623,7 +648,7 @@ public final class SignalServiceContent {
     }
   }
 
-  private static List<SignalServiceDataMessage.Preview> createPreviews(SignalServiceProtos.DataMessage content) {
+  private static List<SignalServiceDataMessage.Preview> createPreviews(SignalServiceProtos.DataMessage content) throws ProtocolInvalidMessageException {
     if (content.getPreviewCount() <= 0) return null;
 
     List<SignalServiceDataMessage.Preview> results = new LinkedList<>();
@@ -643,7 +668,7 @@ public final class SignalServiceContent {
     return results;
   }
 
-  private static SignalServiceDataMessage.Sticker createSticker(SignalServiceProtos.DataMessage content) {
+  private static SignalServiceDataMessage.Sticker createSticker(SignalServiceProtos.DataMessage content) throws ProtocolInvalidMessageException {
     if (!content.hasSticker()                ||
         !content.getSticker().hasPackId()    ||
         !content.getSticker().hasPackKey()   ||
@@ -678,7 +703,17 @@ public final class SignalServiceContent {
                         reaction.getTargetSentTimestamp());
   }
 
-  private static List<SharedContact> createSharedContacts(SignalServiceProtos.DataMessage content) {
+  private static SignalServiceDataMessage.RemoteDelete createRemoteDelete(SignalServiceProtos.DataMessage content) {
+    if (!content.hasDelete() || !content.getDelete().hasTargetSentTimestamp()) {
+      return null;
+    }
+
+    SignalServiceProtos.DataMessage.Delete delete = content.getDelete();
+
+    return new SignalServiceDataMessage.RemoteDelete(delete.getTargetSentTimestamp());
+  }
+
+  private static List<SharedContact> createSharedContacts(SignalServiceProtos.DataMessage content) throws ProtocolInvalidMessageException {
     if (content.getContactCount() <= 0) return null;
 
     List<SharedContact> results = new LinkedList<>();
@@ -773,8 +808,9 @@ public final class SignalServiceContent {
     return results;
   }
 
-  private static SignalServiceAttachmentPointer createAttachmentPointer(SignalServiceProtos.AttachmentPointer pointer) {
-    return new SignalServiceAttachmentPointer(pointer.getId(),
+  private static SignalServiceAttachmentPointer createAttachmentPointer(SignalServiceProtos.AttachmentPointer pointer) throws ProtocolInvalidMessageException {
+    return new SignalServiceAttachmentPointer(pointer.getCdnNumber(),
+                                              SignalServiceAttachmentRemoteId.from(pointer),
                                               pointer.getContentType(),
                                               pointer.getKey().toByteArray(),
                                               pointer.hasSize() ? Optional.of(pointer.getSize()) : Optional.<Integer>absent(),
@@ -784,7 +820,8 @@ public final class SignalServiceContent {
                                               pointer.hasFileName() ? Optional.of(pointer.getFileName()) : Optional.<String>absent(),
                                               (pointer.getFlags() & SignalServiceProtos.AttachmentPointer.Flags.VOICE_MESSAGE_VALUE) != 0,
                                               pointer.hasCaption() ? Optional.of(pointer.getCaption()) : Optional.<String>absent(),
-                                              pointer.hasBlurHash() ? Optional.of(pointer.getBlurHash()) : Optional.<String>absent());
+                                              pointer.hasBlurHash() ? Optional.of(pointer.getBlurHash()) : Optional.<String>absent(),
+                                              pointer.hasUploadTimestamp() ? pointer.getUploadTimestamp() : 0);
 
   }
 
@@ -831,7 +868,8 @@ public final class SignalServiceContent {
       if (content.getGroup().hasAvatar()) {
         SignalServiceProtos.AttachmentPointer pointer = content.getGroup().getAvatar();
 
-        avatar = new SignalServiceAttachmentPointer(pointer.getId(),
+        avatar = new SignalServiceAttachmentPointer(pointer.getCdnNumber(),
+                                                    SignalServiceAttachmentRemoteId.from(pointer),
                                                     pointer.getContentType(),
                                                     pointer.getKey().toByteArray(),
                                                     Optional.of(pointer.getSize()),
@@ -840,7 +878,8 @@ public final class SignalServiceContent {
                                                     Optional.<String>absent(),
                                                     false,
                                                     Optional.<String>absent(),
-                                                    Optional.<String>absent());
+                                                    Optional.<String>absent(),
+                                                    pointer.hasUploadTimestamp() ? pointer.getUploadTimestamp() : 0);
       }
 
       return new SignalServiceGroup(type, content.getGroup().getId().toByteArray(), name, members, avatar);
