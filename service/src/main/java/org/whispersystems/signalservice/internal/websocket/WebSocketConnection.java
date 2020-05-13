@@ -244,6 +244,7 @@ public class WebSocketConnection extends WebSocketListener {
       attempts        = 0;
       connected       = true;
       keepAliveSender = new KeepAliveSender();
+      keepAliveSender.setDaemon(true);
       keepAliveSender.start();
 
       if (listener != null) listener.onConnected();
