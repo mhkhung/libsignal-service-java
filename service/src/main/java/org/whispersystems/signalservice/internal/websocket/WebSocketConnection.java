@@ -64,6 +64,7 @@ public class WebSocketConnection extends WebSocketListener {
   private final List<Interceptor>             interceptors;
   private final Optional<Dns>                 dns;
 
+  private OkHttpClient        okHttpClient;
   private WebSocket           client;
   private KeepAliveSender     keepAliveSender;
   private int                 attempts;
@@ -137,7 +138,7 @@ public class WebSocketConnection extends WebSocketListener {
         clientBuilder.addInterceptor(interceptor);
       }
 
-      OkHttpClient okHttpClient = clientBuilder.build();
+      this.okHttpClient = clientBuilder.build();
 
       Request.Builder requestBuilder = new Request.Builder().url(filledUri);
 
@@ -150,7 +151,7 @@ public class WebSocketConnection extends WebSocketListener {
       }
 
       this.connected = false;
-      this.client    = okHttpClient.newWebSocket(requestBuilder.build(), this);
+      this.client    = this.okHttpClient.newWebSocket(requestBuilder.build(), this);
     }
   }
 
@@ -302,6 +303,11 @@ public class WebSocketConnection extends WebSocketListener {
       client    = null;
       connected = false;
       connect();
+    }
+
+    if (okHttpClient != null ) {
+      okHttpClient.dispatcher().executorService().shutdown();
+      okHttpClient = null;
     }
 
     notifyAll();
