@@ -728,7 +728,7 @@ public class SignalServiceAccountManager {
   public void setProfileName(ProfileKey key, String name)
       throws IOException
   {
-    if (FeatureFlags.VERSIONED_PROFILES) {
+    if (FeatureFlags.DISALLOW_OLD_PROFILE_SETTING) {
       throw new AssertionError();
     }
 
@@ -742,7 +742,7 @@ public class SignalServiceAccountManager {
   public Optional<String> setProfileAvatar(ProfileKey key, StreamDetails avatar)
       throws IOException
   {
-    if (FeatureFlags.VERSIONED_PROFILES) {
+    if (FeatureFlags.DISALLOW_OLD_PROFILE_SETTING) {
       throw new AssertionError();
     }
 
@@ -764,10 +764,6 @@ public class SignalServiceAccountManager {
   public Optional<String> setVersionedProfile(UUID uuid, ProfileKey profileKey, String name, StreamDetails avatar)
       throws IOException
   {
-    if (!FeatureFlags.VERSIONED_PROFILES) {
-      throw new AssertionError();
-    }
-
     if (name == null) name = "";
 
     byte[]            ciphertextName    = new ProfileCipher(profileKey).encryptName(name.getBytes(StandardCharsets.UTF_8), ProfileCipher.NAME_PADDED_LENGTH);
@@ -791,7 +787,7 @@ public class SignalServiceAccountManager {
   public Optional<ProfileKeyCredential> resolveProfileKeyCredential(UUID uuid, ProfileKey profileKey)
       throws NonSuccessfulResponseCodeException, PushNetworkException, VerificationFailedException
   {
-    return this.pushServiceSocket.retrieveProfile(uuid, profileKey, Optional.absent()).getProfileKeyCredential();
+    return this.pushServiceSocket.retrieveVersionedProfileAndCredential(uuid, profileKey, Optional.absent()).getProfileKeyCredential();
   }
 
   public void setUsername(String username) throws IOException {

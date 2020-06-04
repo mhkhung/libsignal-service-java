@@ -610,13 +610,9 @@ public class PushServiceSocket {
     }
   }
 
-  public ProfileAndCredential retrieveProfile(UUID target, ProfileKey profileKey, Optional<UnidentifiedAccess> unidentifiedAccess)
+  public ProfileAndCredential retrieveVersionedProfileAndCredential(UUID target, ProfileKey profileKey, Optional<UnidentifiedAccess> unidentifiedAccess)
       throws NonSuccessfulResponseCodeException, PushNetworkException, VerificationFailedException
   {
-    if (!FeatureFlags.VERSIONED_PROFILES) {
-      throw new AssertionError();
-    }
-
     ProfileKeyVersion                  profileKeyIdentifier = profileKey.getProfileKeyVersion(target);
     ProfileKeyCredentialRequestContext requestContext       = clientZkProfileOperations.createProfileKeyCredentialRequestContext(random, target, profileKey);
     ProfileKeyCredentialRequest        request              = requestContext.getRequest();
@@ -641,6 +637,24 @@ public class PushServiceSocket {
     }
   }
 
+  public SignalServiceProfile retrieveVersionedProfile(UUID target, ProfileKey profileKey, Optional<UnidentifiedAccess> unidentifiedAccess)
+      throws NonSuccessfulResponseCodeException, PushNetworkException
+  {
+    ProfileKeyVersion profileKeyIdentifier = profileKey.getProfileKeyVersion(target);
+
+    String version = profileKeyIdentifier.serialize();
+    String subPath = String.format("%s/%s", target, version);
+
+    String response = makeServiceRequest(String.format(PROFILE_PATH, subPath), "GET", null, NO_HEADERS, unidentifiedAccess);
+
+    try {
+      return JsonUtil.fromJson(response, SignalServiceProfile.class);
+    } catch (IOException e) {
+      Log.w(TAG, e);
+      throw new NonSuccessfulResponseCodeException("Unable to parse entity");
+    }
+  }
+
   public void retrieveProfileAvatar(String path, File destination, long maxSizeBytes)
       throws NonSuccessfulResponseCodeException, PushNetworkException {
     try {
@@ -651,7 +665,7 @@ public class PushServiceSocket {
   }
 
   public void setProfileName(String name) throws NonSuccessfulResponseCodeException, PushNetworkException {
-    if (FeatureFlags.VERSIONED_PROFILES) {
+    if (FeatureFlags.DISALLOW_OLD_PROFILE_SETTING) {
       throw new AssertionError();
     }
 
@@ -661,7 +675,7 @@ public class PushServiceSocket {
   public Optional<String> setProfileAvatar(ProfileAvatarData profileAvatar)
       throws NonSuccessfulResponseCodeException, PushNetworkException
   {
-    if (FeatureFlags.VERSIONED_PROFILES) {
+    if (FeatureFlags.DISALLOW_OLD_PROFILE_SETTING) {
       throw new AssertionError();
     }
 
@@ -695,10 +709,6 @@ public class PushServiceSocket {
   public Optional<String> writeProfile(SignalServiceProfileWrite signalServiceProfileWrite, ProfileAvatarData profileAvatar)
       throws NonSuccessfulResponseCodeException, PushNetworkException
   {
-    if (!FeatureFlags.VERSIONED_PROFILES) {
-      throw new AssertionError();
-    }
-
     String                        requestBody    = JsonUtil.toJson(signalServiceProfileWrite);
     ProfileAvatarUploadAttributes formAttributes;
 
@@ -1468,8 +1478,9 @@ public class PushServiceSocket {
                                                            .readTimeout(soTimeoutMillis, TimeUnit.MILLISECONDS)
                                                            .build();
 
-      Log.d(TAG, "Push service URL: " + connectionHolder.getUrl());
-      Log.d(TAG, "Opening URL: " + String.format("%s%s", connectionHolder.getUrl(), urlFragment));
+//      Log.d(TAG, "Push service URL: " + connectionHolder.getUrl());
+//      Log.d(TAG, "Opening URL: " + String.format("%s%s", connectionHolder.getUrl(), urlFragment));
+      Log.d(TAG, "Opening URL: <REDACTED>");
 
       Request.Builder request = new Request.Builder();
       request.url(String.format("%s%s", connectionHolder.getUrl(), urlFragment));
@@ -1612,7 +1623,8 @@ public class PushServiceSocket {
                                                         .readTimeout(soTimeoutMillis, TimeUnit.MILLISECONDS)
                                                         .build();
 
-    Log.d(TAG, "Opening URL: " + String.format("%s%s", connectionHolder.getUrl(), path));
+//    Log.d(TAG, "Opening URL: " + String.format("%s%s", connectionHolder.getUrl(), path));
+    Log.d(TAG, "Opening URL: <REDACTED>");
 
     Request.Builder request = new Request.Builder().url(connectionHolder.getUrl() + path);
     request.method(method, body);
@@ -1892,7 +1904,6 @@ public class PushServiceSocket {
   };
   private static final ResponseCodeHandler GROUPS_V2_PATCH_RESPONSE_HANDLER = responseCode -> {
     if (responseCode == 400) throw new GroupPatchNotAcceptedException();
-    if (responseCode == 403) throw new NotInGroupException();
   };
 
   public void putNewGroupsV2Group(Group group, GroupsV2AuthorizationString authorization)
