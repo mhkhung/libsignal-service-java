@@ -77,6 +77,15 @@ final class ProtoTestUtils {
                           .build();
   }
 
+  static DecryptedMember member(UUID uuid, ByteString profileKey, int joinedAtRevision) {
+    return DecryptedMember.newBuilder()
+                          .setUuid(UuidUtil.toByteString(uuid))
+                          .setRole(Member.Role.DEFAULT)
+                          .setJoinedAtRevision(joinedAtRevision)
+                          .setProfileKey(profileKey)
+                          .build();
+  }
+
   static DecryptedPendingMemberRemoval pendingMemberRemoval(UUID uuid) {
     return DecryptedPendingMemberRemoval.newBuilder()
                                         .setUuid(UuidUtil.toByteString(uuid))
@@ -94,6 +103,10 @@ final class ProtoTestUtils {
 
   static DecryptedMember member(UUID uuid, ProfileKey profileKey) {
     return withProfileKey(member(uuid), profileKey);
+  }
+
+  static DecryptedMember admin(UUID uuid, ProfileKey profileKey) {
+    return withProfileKey(admin(uuid), profileKey);
   }
 
   static DecryptedMember admin(UUID uuid) {

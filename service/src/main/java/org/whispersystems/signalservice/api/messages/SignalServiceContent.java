@@ -61,7 +61,8 @@ public final class SignalServiceContent {
   private final SignalServiceAddress      sender;
   private final int                       senderDevice;
   private final long                      timestamp;
-  private final long                      serverTimestamp;
+  private final long                      serverReceivedTimestamp;
+  private final long                      serverDeliveredTimestamp;
   private final boolean                   needsReceipt;
   private final SignalServiceContentProto serializedState;
 
@@ -71,13 +72,22 @@ public final class SignalServiceContent {
   private final Optional<SignalServiceReceiptMessage> readMessage;
   private final Optional<SignalServiceTypingMessage>  typingMessage;
 
-  private SignalServiceContent(SignalServiceDataMessage message, SignalServiceAddress sender, int senderDevice, long timestamp, long serverTimestamp, boolean needsReceipt, SignalServiceContentProto serializedState) {
-    this.sender          = sender;
-    this.senderDevice    = senderDevice;
-    this.timestamp       = timestamp;
-    this.serverTimestamp = serverTimestamp;
-    this.needsReceipt    = needsReceipt;
-    this.serializedState = serializedState;
+  private SignalServiceContent(SignalServiceDataMessage message,
+                               SignalServiceAddress sender,
+                               int senderDevice,
+                               long timestamp,
+                               long serverReceivedTimestamp,
+                               long serverDeliveredTimestamp,
+                               boolean needsReceipt,
+                               SignalServiceContentProto serializedState)
+  {
+    this.sender                   = sender;
+    this.senderDevice             = senderDevice;
+    this.timestamp                = timestamp;
+    this.serverReceivedTimestamp  = serverReceivedTimestamp;
+    this.serverDeliveredTimestamp = serverDeliveredTimestamp;
+    this.needsReceipt             = needsReceipt;
+    this.serializedState          = serializedState;
 
     this.message            = Optional.fromNullable(message);
     this.synchronizeMessage = Optional.absent();
@@ -86,13 +96,22 @@ public final class SignalServiceContent {
     this.typingMessage      = Optional.absent();
   }
 
-  private SignalServiceContent(SignalServiceSyncMessage synchronizeMessage, SignalServiceAddress sender, int senderDevice, long timestamp, long serverTimestamp, boolean needsReceipt, SignalServiceContentProto serializedState) {
-    this.sender          = sender;
-    this.senderDevice    = senderDevice;
-    this.timestamp       = timestamp;
-    this.serverTimestamp = serverTimestamp;
-    this.needsReceipt    = needsReceipt;
-    this.serializedState = serializedState;
+  private SignalServiceContent(SignalServiceSyncMessage synchronizeMessage,
+                               SignalServiceAddress sender,
+                               int senderDevice,
+                               long timestamp,
+                               long serverReceivedTimestamp,
+                               long serverDeliveredTimestamp,
+                               boolean needsReceipt,
+                               SignalServiceContentProto serializedState)
+  {
+    this.sender                   = sender;
+    this.senderDevice             = senderDevice;
+    this.timestamp                = timestamp;
+    this.serverReceivedTimestamp  = serverReceivedTimestamp;
+    this.serverDeliveredTimestamp = serverDeliveredTimestamp;
+    this.needsReceipt             = needsReceipt;
+    this.serializedState          = serializedState;
 
     this.message            = Optional.absent();
     this.synchronizeMessage = Optional.fromNullable(synchronizeMessage);
@@ -101,13 +120,22 @@ public final class SignalServiceContent {
     this.typingMessage      = Optional.absent();
   }
 
-  private SignalServiceContent(SignalServiceCallMessage callMessage, SignalServiceAddress sender, int senderDevice, long timestamp, long serverTimestamp, boolean needsReceipt, SignalServiceContentProto serializedState) {
-    this.sender          = sender;
-    this.senderDevice    = senderDevice;
-    this.timestamp       = timestamp;
-    this.serverTimestamp = serverTimestamp;
-    this.needsReceipt    = needsReceipt;
-    this.serializedState = serializedState;
+  private SignalServiceContent(SignalServiceCallMessage callMessage,
+                               SignalServiceAddress sender,
+                               int senderDevice,
+                               long timestamp,
+                               long serverReceivedTimestamp,
+                               long serverDeliveredTimestamp,
+                               boolean needsReceipt,
+                               SignalServiceContentProto serializedState)
+  {
+    this.sender                   = sender;
+    this.senderDevice             = senderDevice;
+    this.timestamp                = timestamp;
+    this.serverReceivedTimestamp  = serverReceivedTimestamp;
+    this.serverDeliveredTimestamp = serverDeliveredTimestamp;
+    this.needsReceipt             = needsReceipt;
+    this.serializedState          = serializedState;
 
     this.message            = Optional.absent();
     this.synchronizeMessage = Optional.absent();
@@ -116,13 +144,22 @@ public final class SignalServiceContent {
     this.typingMessage      = Optional.absent();
   }
 
-  private SignalServiceContent(SignalServiceReceiptMessage receiptMessage, SignalServiceAddress sender, int senderDevice, long timestamp, long serverTimestamp, boolean needsReceipt, SignalServiceContentProto serializedState) {
-    this.sender          = sender;
-    this.senderDevice    = senderDevice;
-    this.timestamp       = timestamp;
-    this.serverTimestamp = serverTimestamp;
-    this.needsReceipt    = needsReceipt;
-    this.serializedState = serializedState;
+  private SignalServiceContent(SignalServiceReceiptMessage receiptMessage,
+                               SignalServiceAddress sender,
+                               int senderDevice,
+                               long timestamp,
+                               long serverReceivedTimestamp,
+                               long serverDeliveredTimestamp,
+                               boolean needsReceipt,
+                               SignalServiceContentProto serializedState)
+  {
+    this.sender                   = sender;
+    this.senderDevice             = senderDevice;
+    this.timestamp                = timestamp;
+    this.serverReceivedTimestamp  = serverReceivedTimestamp;
+    this.serverDeliveredTimestamp = serverDeliveredTimestamp;
+    this.needsReceipt             = needsReceipt;
+    this.serializedState          = serializedState;
 
     this.message            = Optional.absent();
     this.synchronizeMessage = Optional.absent();
@@ -131,13 +168,22 @@ public final class SignalServiceContent {
     this.typingMessage      = Optional.absent();
   }
 
-  private SignalServiceContent(SignalServiceTypingMessage typingMessage, SignalServiceAddress sender, int senderDevice, long timestamp, long serverTimestamp, boolean needsReceipt, SignalServiceContentProto serializedState) {
-    this.sender          = sender;
-    this.senderDevice    = senderDevice;
-    this.timestamp       = timestamp;
-    this.serverTimestamp = serverTimestamp;
-    this.needsReceipt    = needsReceipt;
-    this.serializedState = serializedState;
+  private SignalServiceContent(SignalServiceTypingMessage typingMessage,
+                               SignalServiceAddress sender,
+                               int senderDevice,
+                               long timestamp,
+                               long serverReceivedTimestamp,
+                               long serverDeliveredTimestamp,
+                               boolean needsReceipt,
+                               SignalServiceContentProto serializedState)
+  {
+    this.sender                   = sender;
+    this.senderDevice             = senderDevice;
+    this.timestamp                = timestamp;
+    this.serverReceivedTimestamp  = serverReceivedTimestamp;
+    this.serverDeliveredTimestamp = serverDeliveredTimestamp;
+    this.needsReceipt             = needsReceipt;
+    this.serializedState          = serializedState;
 
     this.message            = Optional.absent();
     this.synchronizeMessage = Optional.absent();
@@ -178,8 +224,12 @@ public final class SignalServiceContent {
     return timestamp;
   }
 
-  public long getServerTimestamp() {
-    return serverTimestamp;
+  public long getServerReceivedTimestamp() {
+    return serverReceivedTimestamp;
+  }
+
+  public long getServerDeliveredTimestamp() {
+    return serverDeliveredTimestamp;
   }
 
   public boolean isNeedsReceipt() {
@@ -219,7 +269,8 @@ public final class SignalServiceContent {
                                       metadata.getSender(),
                                       metadata.getSenderDevice(),
                                       metadata.getTimestamp(),
-                                      metadata.getServerTimestamp(),
+                                      metadata.getServerReceivedTimestamp(),
+                                      metadata.getServerDeliveredTimestamp(),
                                       metadata.isNeedsReceipt(),
                                       serviceContentProto);
     } else if (serviceContentProto.getDataCase() == SignalServiceContentProto.DataCase.CONTENT) {
@@ -230,7 +281,8 @@ public final class SignalServiceContent {
                                         metadata.getSender(),
                                         metadata.getSenderDevice(),
                                         metadata.getTimestamp(),
-                                        metadata.getServerTimestamp(),
+                                        metadata.getServerReceivedTimestamp(),
+                                        metadata.getServerDeliveredTimestamp(),
                                         metadata.isNeedsReceipt(),
                                         serviceContentProto);
       } else if (message.hasSyncMessage() && localAddress.matches(metadata.getSender())) {
@@ -238,7 +290,8 @@ public final class SignalServiceContent {
                                         metadata.getSender(),
                                         metadata.getSenderDevice(),
                                         metadata.getTimestamp(),
-                                        metadata.getServerTimestamp(),
+                                        metadata.getServerReceivedTimestamp(),
+                                        metadata.getServerDeliveredTimestamp(),
                                         metadata.isNeedsReceipt(),
                                         serviceContentProto);
       } else if (message.hasCallMessage()) {
@@ -246,7 +299,8 @@ public final class SignalServiceContent {
                                         metadata.getSender(),
                                         metadata.getSenderDevice(),
                                         metadata.getTimestamp(),
-                                        metadata.getServerTimestamp(),
+                                        metadata.getServerReceivedTimestamp(),
+                                        metadata.getServerDeliveredTimestamp(),
                                         metadata.isNeedsReceipt(),
                                         serviceContentProto);
       } else if (message.hasReceiptMessage()) {
@@ -254,7 +308,8 @@ public final class SignalServiceContent {
                                         metadata.getSender(),
                                         metadata.getSenderDevice(),
                                         metadata.getTimestamp(),
-                                        metadata.getServerTimestamp(),
+                                        metadata.getServerReceivedTimestamp(),
+                                        metadata.getServerDeliveredTimestamp(),
                                         metadata.isNeedsReceipt(),
                                         serviceContentProto);
       } else if (message.hasTypingMessage()) {
@@ -262,7 +317,8 @@ public final class SignalServiceContent {
                                         metadata.getSender(),
                                         metadata.getSenderDevice(),
                                         metadata.getTimestamp(),
-                                        metadata.getServerTimestamp(),
+                                        metadata.getServerReceivedTimestamp(),
+                                        metadata.getServerDeliveredTimestamp(),
                                         false,
                                         serviceContentProto);
       }
@@ -293,6 +349,7 @@ public final class SignalServiceContent {
     SignalServiceDataMessage.Quote         quote            = createQuote(content);
     List<SharedContact>                    sharedContacts   = createSharedContacts(content);
     List<SignalServiceDataMessage.Preview> previews         = createPreviews(content);
+    List<SignalServiceDataMessage.Mention> mentions         = createMentions(content);
     SignalServiceDataMessage.Sticker       sticker          = createSticker(content);
     SignalServiceDataMessage.Reaction      reaction         = createReaction(content);
     SignalServiceDataMessage.RemoteDelete  remoteDelete     = createRemoteDelete(content);
@@ -327,6 +384,7 @@ public final class SignalServiceContent {
                                         quote,
                                         sharedContacts,
                                         previews,
+                                        mentions,
                                         sticker,
                                         content.getIsViewOnce(),
                                         reaction,
@@ -540,6 +598,7 @@ public final class SignalServiceContent {
                       pointer.hasDigest() ? Optional.of(pointer.getDigest().toByteArray()) : Optional.<byte[]>absent(),
                       pointer.hasFileName() ? Optional.of(pointer.getFileName()) : Optional.<String>absent(),
                       (pointer.getFlags() & AttachmentPointer.Flags.VOICE_MESSAGE_VALUE) != 0,
+                      (pointer.getFlags() & AttachmentPointer.Flags.BORDERLESS_VALUE) != 0,
                       pointer.hasCaption() ? Optional.of(pointer.getCaption()) : Optional.<String>absent(),
                       pointer.hasBlurHash() ? Optional.of(pointer.getBlurHash()) : Optional.<String>absent(),
                       pointer.hasUploadTimestamp() ? pointer.getUploadTimestamp() : 0
@@ -560,6 +619,7 @@ public final class SignalServiceContent {
                       pointer.hasDigest() ? Optional.of(pointer.getDigest().toByteArray()) : Optional.<byte[]>absent(),
                       pointer.hasFileName() ? Optional.of(pointer.getFileName()) : Optional.<String>absent(),
                       (pointer.getFlags() & AttachmentPointer.Flags.VOICE_MESSAGE_VALUE) != 0,
+                      (pointer.getFlags() & AttachmentPointer.Flags.BORDERLESS_VALUE) != 0,
                       pointer.hasCaption() ? Optional.of(pointer.getCaption()) : Optional.<String>absent(),
                       pointer.hasBlurHash() ? Optional.of(pointer.getBlurHash()) : Optional.<String>absent(),
                       pointer.hasUploadTimestamp() ? pointer.getUploadTimestamp() : 0
@@ -576,20 +636,23 @@ public final class SignalServiceContent {
 
     if (content.hasOffer()) {
       SignalServiceProtos.CallMessage.Offer offerContent = content.getOffer();
-      return SignalServiceCallMessage.forOffer(new OfferMessage(offerContent.getId(), offerContent.getDescription(), OfferMessage.Type.fromProto(offerContent.getType())), isMultiRing, destinationDeviceId);
+      return SignalServiceCallMessage.forOffer(new OfferMessage(offerContent.getId(), offerContent.hasSdp() ? offerContent.getSdp() : null, OfferMessage.Type.fromProto(offerContent.getType()), offerContent.hasOpaque() ? offerContent.getOpaque().toByteArray() : null), isMultiRing, destinationDeviceId);
     } else if (content.hasAnswer()) {
       SignalServiceProtos.CallMessage.Answer answerContent = content.getAnswer();
-      return SignalServiceCallMessage.forAnswer(new AnswerMessage(answerContent.getId(), answerContent.getDescription()), isMultiRing, destinationDeviceId);
+      return SignalServiceCallMessage.forAnswer(new AnswerMessage(answerContent.getId(), answerContent.hasSdp() ? answerContent.getSdp() : null, answerContent.hasOpaque() ? answerContent.getOpaque().toByteArray() : null), isMultiRing, destinationDeviceId);
     } else if (content.getIceUpdateCount() > 0) {
       List<IceUpdateMessage> iceUpdates = new LinkedList<>();
 
       for (SignalServiceProtos.CallMessage.IceUpdate iceUpdate : content.getIceUpdateList()) {
-        iceUpdates.add(new IceUpdateMessage(iceUpdate.getId(), iceUpdate.getSdpMid(), iceUpdate.getSdpMLineIndex(), iceUpdate.getSdp()));
+        iceUpdates.add(new IceUpdateMessage(iceUpdate.getId(), iceUpdate.hasOpaque() ? iceUpdate.getOpaque().toByteArray() : null, iceUpdate.hasSdp() ? iceUpdate.getSdp() : null));
       }
 
       return SignalServiceCallMessage.forIceUpdates(iceUpdates, isMultiRing, destinationDeviceId);
+    } else if (content.hasLegacyHangup()) {
+      SignalServiceProtos.CallMessage.Hangup hangup = content.getLegacyHangup();
+      return SignalServiceCallMessage.forHangup(new HangupMessage(hangup.getId(), HangupMessage.Type.fromProto(hangup.getType()), hangup.getDeviceId(), content.hasLegacyHangup()), isMultiRing, destinationDeviceId);
     } else if (content.hasHangup()) {
-      SignalServiceProtos.CallMessage.Hangup hangup = content.hasLegacyHangup() ? content.getLegacyHangup() : content.getHangup();
+      SignalServiceProtos.CallMessage.Hangup hangup = content.getHangup();
       return SignalServiceCallMessage.forHangup(new HangupMessage(hangup.getId(), HangupMessage.Type.fromProto(hangup.getType()), hangup.getDeviceId(), content.hasLegacyHangup()), isMultiRing, destinationDeviceId);
     } else if (content.hasBusy()) {
       SignalServiceProtos.CallMessage.Busy busy = content.getBusy();
@@ -644,7 +707,8 @@ public final class SignalServiceContent {
       return new SignalServiceDataMessage.Quote(content.getQuote().getId(),
                                                 address,
                                                 content.getQuote().getText(),
-                                                attachments);
+                                                attachments,
+                                                createMentions(content));
     } else {
       Log.w(TAG, "Quote was missing an author! Returning null.");
       return null;
@@ -669,6 +733,35 @@ public final class SignalServiceContent {
     }
 
     return results;
+  }
+
+  private static List<SignalServiceDataMessage.Mention> createMentions(SignalServiceProtos.DataMessage content) throws ProtocolInvalidMessageException {
+    if (content.getBodyRangesCount() <= 0 || !content.hasBody()) return null;
+
+    List<SignalServiceDataMessage.Mention> mentions = new LinkedList<>();
+
+    for (SignalServiceProtos.DataMessage.BodyRange bodyRange : content.getBodyRangesList()) {
+      if (bodyRange.hasMentionUuid()) {
+        try {
+          validateBodyRange(content, bodyRange);
+          mentions.add(new SignalServiceDataMessage.Mention(UuidUtil.parseOrThrow(bodyRange.getMentionUuid()), bodyRange.getStart(), bodyRange.getLength()));
+        } catch (IllegalArgumentException e) {
+          throw new ProtocolInvalidMessageException(new InvalidMessageException(e), null, 0);
+        }
+      }
+    }
+
+    return mentions;
+  }
+
+  private static void validateBodyRange(SignalServiceProtos.DataMessage content, SignalServiceProtos.DataMessage.BodyRange bodyRange) throws ProtocolInvalidMessageException {
+    int incomingBodyLength = content.hasBody() ? content.getBody().length() : -1;
+    int start              = bodyRange.hasStart() ? bodyRange.getStart() : -1;
+    int length             = bodyRange.hasLength() ? bodyRange.getLength() : -1;
+
+    if (start < 0 || length < 0 || (start + length) > incomingBodyLength) {
+      throw new ProtocolInvalidMessageException(new InvalidMessageException("Incoming body range has out-of-bound range"), null, 0);
+    }
   }
 
   private static SignalServiceDataMessage.Sticker createSticker(SignalServiceProtos.DataMessage content) throws ProtocolInvalidMessageException {
@@ -822,6 +915,7 @@ public final class SignalServiceContent {
                                               pointer.hasDigest() ? Optional.of(pointer.getDigest().toByteArray()) : Optional.<byte[]>absent(),
                                               pointer.hasFileName() ? Optional.of(pointer.getFileName()) : Optional.<String>absent(),
                                               (pointer.getFlags() & SignalServiceProtos.AttachmentPointer.Flags.VOICE_MESSAGE_VALUE) != 0,
+                                              (pointer.getFlags() & SignalServiceProtos.AttachmentPointer.Flags.BORDERLESS_VALUE) != 0,
                                               pointer.hasCaption() ? Optional.of(pointer.getCaption()) : Optional.<String>absent(),
                                               pointer.hasBlurHash() ? Optional.of(pointer.getBlurHash()) : Optional.<String>absent(),
                                               pointer.hasUploadTimestamp() ? pointer.getUploadTimestamp() : 0);
@@ -854,8 +948,8 @@ public final class SignalServiceContent {
         members = new ArrayList<>(content.getGroup().getMembersCount());
 
         for (SignalServiceProtos.GroupContext.Member member : content.getGroup().getMembersList()) {
-          if (SignalServiceAddress.isValidAddress(member.getUuid(), member.getE164())) {
-            members.add(new SignalServiceAddress(UuidUtil.parseOrNull(member.getUuid()), member.getE164()));
+          if (SignalServiceAddress.isValidAddress(null, member.getE164())) {
+            members.add(new SignalServiceAddress(null, member.getE164()));
           } else {
             throw new ProtocolInvalidMessageException(new InvalidMessageException("GroupContext.Member had no address!"), null, 0);
           }
@@ -879,6 +973,7 @@ public final class SignalServiceContent {
                                                     Optional.<byte[]>absent(), 0, 0,
                                                     Optional.fromNullable(pointer.hasDigest() ? pointer.getDigest().toByteArray() : null),
                                                     Optional.<String>absent(),
+                                                    false,
                                                     false,
                                                     Optional.<String>absent(),
                                                     Optional.<String>absent(),
@@ -910,7 +1005,7 @@ public final class SignalServiceContent {
       throw new ProtocolInvalidMessageException(new InvalidMessageException(e), null, 0);
     }
 
-    if (groupV2.hasGroupChange()) {
+    if (groupV2.hasGroupChange() && !groupV2.getGroupChange().isEmpty()) {
       builder.withSignedGroupChange(groupV2.getGroupChange().toByteArray());
     }
 

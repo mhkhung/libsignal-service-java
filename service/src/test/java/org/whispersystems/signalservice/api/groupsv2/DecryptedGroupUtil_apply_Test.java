@@ -1,5 +1,7 @@
 package org.whispersystems.signalservice.api.groupsv2;
 
+import com.google.protobuf.ByteString;
+
 import org.junit.Test;
 import org.signal.storageservice.protos.groups.AccessControl;
 import org.signal.storageservice.protos.groups.Member;
@@ -12,6 +14,7 @@ import org.signal.storageservice.protos.groups.local.DecryptedPendingMemberRemov
 import org.signal.storageservice.protos.groups.local.DecryptedString;
 import org.signal.storageservice.protos.groups.local.DecryptedTimer;
 import org.signal.zkgroup.profiles.ProfileKey;
+import org.whispersystems.signalservice.api.util.UuidUtil;
 
 import java.util.UUID;
 
@@ -27,7 +30,7 @@ import static org.whispersystems.signalservice.api.groupsv2.ProtoTestUtils.withP
 public final class DecryptedGroupUtil_apply_Test {
 
   @Test
-  public void apply_revision() throws DecryptedGroupUtil.NotAbleToApplyChangeException {
+  public void apply_revision() throws NotAbleToApplyGroupV2ChangeException {
     DecryptedGroup newGroup = DecryptedGroupUtil.apply(DecryptedGroup.newBuilder()
                                                                      .setRevision(9)
                                                                      .build(),
@@ -39,7 +42,7 @@ public final class DecryptedGroupUtil_apply_Test {
   }
 
   @Test
-  public void apply_new_member() throws DecryptedGroupUtil.NotAbleToApplyChangeException {
+  public void apply_new_member() throws NotAbleToApplyGroupV2ChangeException {
     DecryptedMember member1 = member(UUID.randomUUID());
     DecryptedMember member2 = member(UUID.randomUUID());
 
@@ -61,7 +64,7 @@ public final class DecryptedGroupUtil_apply_Test {
   }
 
   @Test
-  public void apply_remove_member() throws DecryptedGroupUtil.NotAbleToApplyChangeException {
+  public void apply_remove_member() throws NotAbleToApplyGroupV2ChangeException {
     DecryptedMember member1 = member(UUID.randomUUID());
     DecryptedMember member2 = member(UUID.randomUUID());
 
@@ -83,7 +86,7 @@ public final class DecryptedGroupUtil_apply_Test {
   }
 
   @Test
-  public void apply_remove_members() throws DecryptedGroupUtil.NotAbleToApplyChangeException {
+  public void apply_remove_members() throws NotAbleToApplyGroupV2ChangeException {
     DecryptedMember member1 = member(UUID.randomUUID());
     DecryptedMember member2 = member(UUID.randomUUID());
 
@@ -104,23 +107,29 @@ public final class DecryptedGroupUtil_apply_Test {
                  newGroup);
   }
 
-  @Test(expected = DecryptedGroupUtil.NotAbleToApplyChangeException.class)
-  public void apply_remove_members_not_found() throws DecryptedGroupUtil.NotAbleToApplyChangeException {
+  @Test
+  public void apply_remove_members_not_found() throws NotAbleToApplyGroupV2ChangeException {
     DecryptedMember member1 = member(UUID.randomUUID());
     DecryptedMember member2 = member(UUID.randomUUID());
 
-    DecryptedGroupUtil.apply(DecryptedGroup.newBuilder()
-                                           .setRevision(13)
-                                           .addMembers(member1)
-                                           .build(),
-                             DecryptedGroupChange.newBuilder()
-                                                 .setRevision(14)
-                                                 .addDeleteMembers(member2.getUuid())
-                                                 .build());
+    DecryptedGroup newGroup = DecryptedGroupUtil.apply(DecryptedGroup.newBuilder()
+                                                                     .setRevision(13)
+                                                                     .addMembers(member1)
+                                                                     .build(),
+                                                       DecryptedGroupChange.newBuilder()
+                                                                           .setRevision(14)
+                                                                           .addDeleteMembers(member2.getUuid())
+                                                                           .build());
+
+    assertEquals(DecryptedGroup.newBuilder()
+                               .addMembers(member1)
+                               .setRevision(14)
+                               .build(),
+                 newGroup);
   }
 
   @Test
-  public void apply_modify_member_role() throws DecryptedGroupUtil.NotAbleToApplyChangeException {
+  public void apply_modify_member_role() throws NotAbleToApplyGroupV2ChangeException {
     DecryptedMember member1 = member(UUID.randomUUID());
     DecryptedMember member2 = admin(UUID.randomUUID());
 
@@ -143,8 +152,42 @@ public final class DecryptedGroupUtil_apply_Test {
                  newGroup);
   }
 
+  @Test(expected = NotAbleToApplyGroupV2ChangeException.class)
+  public void not_able_to_apply_modify_member_role_for_non_member() throws NotAbleToApplyGroupV2ChangeException {
+    DecryptedMember member1 = member(UUID.randomUUID());
+    DecryptedMember member2 = member(UUID.randomUUID());
+
+    DecryptedGroupUtil.apply(DecryptedGroup.newBuilder()
+                                           .setRevision(13)
+                                           .addMembers(member1)
+                                           .build(),
+                             DecryptedGroupChange.newBuilder()
+                                                 .setRevision(14)
+                                                 .addModifyMemberRoles(DecryptedModifyMemberRole.newBuilder()
+                                                                                                .setRole(Member.Role.ADMINISTRATOR)
+                                                                                                .setUuid(member2.getUuid())
+                                                                                                .build())
+                                                 .build());
+  }
+
+  @Test(expected = NotAbleToApplyGroupV2ChangeException.class)
+  public void not_able_to_apply_modify_member_role_for_no_role() throws NotAbleToApplyGroupV2ChangeException {
+    DecryptedMember member1 = member(UUID.randomUUID());
+
+    DecryptedGroupUtil.apply(DecryptedGroup.newBuilder()
+                                           .setRevision(13)
+                                           .addMembers(member1)
+                                           .build(),
+                             DecryptedGroupChange.newBuilder()
+                                                 .setRevision(14)
+                                                 .addModifyMemberRoles(DecryptedModifyMemberRole.newBuilder()
+                                                                                                .setUuid(member1.getUuid())
+                                                                                                .build())
+                                                 .build());
+  }
+
   @Test
-  public void apply_modify_member_profile_keys() throws DecryptedGroupUtil.NotAbleToApplyChangeException {
+  public void apply_modify_member_profile_keys() throws NotAbleToApplyGroupV2ChangeException {
     ProfileKey      profileKey1  = randomProfileKey();
     ProfileKey      profileKey2a = randomProfileKey();
     ProfileKey      profileKey2b = randomProfileKey();
@@ -170,8 +213,58 @@ public final class DecryptedGroupUtil_apply_Test {
                  newGroup);
   }
 
+  @Test(expected = NotAbleToApplyGroupV2ChangeException.class)
+  public void cant_apply_modify_member_profile_keys_if_member_not_in_group() throws NotAbleToApplyGroupV2ChangeException {
+    ProfileKey      profileKey1  = randomProfileKey();
+    ProfileKey      profileKey2a = randomProfileKey();
+    ProfileKey      profileKey2b = randomProfileKey();
+    DecryptedMember member1      = member(UUID.randomUUID(), profileKey1);
+    DecryptedMember member2a     = member(UUID.randomUUID(), profileKey2a);
+    DecryptedMember member2b     = member(UUID.randomUUID(), profileKey2b);
+
+    DecryptedGroupUtil.apply(DecryptedGroup.newBuilder()
+                                           .setRevision(13)
+                                           .addMembers(member1)
+                                           .addMembers(member2a)
+                                           .build(),
+                             DecryptedGroupChange.newBuilder()
+                                                 .setRevision(14)
+                                                 .addModifiedProfileKeys(member2b)
+                                                 .build());
+  }
+
   @Test
-  public void apply_new_pending_member() throws DecryptedGroupUtil.NotAbleToApplyChangeException {
+  public void apply_modify_admin_profile_keys() throws NotAbleToApplyGroupV2ChangeException {
+    UUID            adminUuid    = UUID.randomUUID();
+    ProfileKey      profileKey1  = randomProfileKey();
+    ProfileKey      profileKey2a = randomProfileKey();
+    ProfileKey      profileKey2b = randomProfileKey();
+    DecryptedMember member1      = member(UUID.randomUUID(), profileKey1);
+    DecryptedMember admin2a      = admin(adminUuid, profileKey2a);
+
+    DecryptedGroup newGroup = DecryptedGroupUtil.apply(DecryptedGroup.newBuilder()
+                                                                     .setRevision(13)
+                                                                     .addMembers(member1)
+                                                                     .addMembers(admin2a)
+                                                                     .build(),
+                                                       DecryptedGroupChange.newBuilder()
+                                                                           .setRevision(14)
+                                                                           .addModifiedProfileKeys(DecryptedMember.newBuilder(DecryptedMember.newBuilder()
+                                                                                                                                             .setUuid(UuidUtil.toByteString(adminUuid))
+                                                                                                                                             .build())
+                                                                                                                   .setProfileKey(ByteString.copyFrom(profileKey2b.serialize())))
+                                                                           .build());
+
+    assertEquals(DecryptedGroup.newBuilder()
+                               .setRevision(14)
+                               .addMembers(member1)
+                               .addMembers(admin(adminUuid, profileKey2b))
+                               .build(),
+                 newGroup);
+  }
+
+  @Test
+  public void apply_new_pending_member() throws NotAbleToApplyGroupV2ChangeException {
     DecryptedMember        member1 = member(UUID.randomUUID());
     DecryptedPendingMember pending = pendingMember(UUID.randomUUID());
 
@@ -193,7 +286,48 @@ public final class DecryptedGroupUtil_apply_Test {
   }
 
   @Test
-  public void remove_pending_member() throws DecryptedGroupUtil.NotAbleToApplyChangeException {
+  public void apply_new_pending_member_already_pending() throws NotAbleToApplyGroupV2ChangeException {
+    DecryptedMember        member1 = member(UUID.randomUUID());
+    DecryptedPendingMember pending = pendingMember(UUID.randomUUID());
+
+    DecryptedGroup newGroup = DecryptedGroupUtil.apply(DecryptedGroup.newBuilder()
+                                                                     .setRevision(10)
+                                                                     .addMembers(member1)
+                                                                     .addPendingMembers(pending)
+                                                                     .build(),
+                                                       DecryptedGroupChange.newBuilder()
+                                                                           .setRevision(11)
+                                                                           .addNewPendingMembers(pending)
+                                                                           .build());
+
+    assertEquals(DecryptedGroup.newBuilder()
+                               .setRevision(11)
+                               .addMembers(member1)
+                               .addPendingMembers(pending)
+                               .build(),
+                 newGroup);
+  }
+
+  @Test(expected = NotAbleToApplyGroupV2ChangeException.class)
+  public void apply_new_pending_member_already_in_group() throws NotAbleToApplyGroupV2ChangeException {
+    DecryptedMember        member1  = member(UUID.randomUUID());
+    UUID                   uuid2    = UUID.randomUUID();
+    DecryptedMember        member2  = member(uuid2);
+    DecryptedPendingMember pending2 = pendingMember(uuid2);
+
+    DecryptedGroupUtil.apply(DecryptedGroup.newBuilder()
+                                           .setRevision(10)
+                                           .addMembers(member1)
+                                           .addMembers(member2)
+                                           .build(),
+                             DecryptedGroupChange.newBuilder()
+                                                 .setRevision(11)
+                                                 .addNewPendingMembers(pending2)
+                                                 .build());
+  }
+
+  @Test
+  public void remove_pending_member() throws NotAbleToApplyGroupV2ChangeException {
     DecryptedMember        member1     = member(UUID.randomUUID());
     UUID                   pendingUuid = UUID.randomUUID();
     DecryptedPendingMember pending     = pendingMember(pendingUuid);
@@ -218,7 +352,30 @@ public final class DecryptedGroupUtil_apply_Test {
   }
 
   @Test
-  public void promote_pending_member() throws DecryptedGroupUtil.NotAbleToApplyChangeException {
+  public void cannot_remove_pending_member_if_not_in_group() throws NotAbleToApplyGroupV2ChangeException {
+    DecryptedMember member1     = member(UUID.randomUUID());
+    UUID            pendingUuid = UUID.randomUUID();
+
+    DecryptedGroup newGroup = DecryptedGroupUtil.apply(DecryptedGroup.newBuilder()
+                                                                     .setRevision(10)
+                                                                     .addMembers(member1)
+                                                                     .build(),
+                                                       DecryptedGroupChange.newBuilder()
+                                                                           .setRevision(11)
+                                                                           .addDeletePendingMembers(DecryptedPendingMemberRemoval.newBuilder()
+                                                                                                                                 .setUuidCipherText(ProtoTestUtils.encrypt(pendingUuid))
+                                                                                                                                 .build())
+                                                                           .build());
+
+    assertEquals(DecryptedGroup.newBuilder()
+                               .setRevision(11)
+                               .addMembers(member1)
+                               .build(),
+                  newGroup);
+  }
+
+  @Test
+  public void promote_pending_member() throws NotAbleToApplyGroupV2ChangeException {
     ProfileKey             profileKey2  = randomProfileKey();
     DecryptedMember        member1      = member(UUID.randomUUID());
     UUID                   pending2Uuid = UUID.randomUUID();
@@ -243,34 +400,62 @@ public final class DecryptedGroupUtil_apply_Test {
                  newGroup);
   }
 
-  @Test
-  public void promote_direct_to_admin() throws DecryptedGroupUtil.NotAbleToApplyChangeException {
+  @Test(expected = NotAbleToApplyGroupV2ChangeException.class)
+  public void cannot_promote_pending_member_if_not_in_group() throws NotAbleToApplyGroupV2ChangeException {
     ProfileKey             profileKey2  = randomProfileKey();
     DecryptedMember        member1      = member(UUID.randomUUID());
     UUID                   pending2Uuid = UUID.randomUUID();
-    DecryptedPendingMember pending2     = pendingMember(pending2Uuid);
     DecryptedMember        member2      = withProfileKey(admin(pending2Uuid), profileKey2);
+
+    DecryptedGroupUtil.apply(DecryptedGroup.newBuilder()
+                                           .setRevision(10)
+                                           .addMembers(member1)
+                                           .build(),
+                             DecryptedGroupChange.newBuilder()
+                                                 .setRevision(11)
+                                                 .addPromotePendingMembers(member2)
+                                                 .build());
+  }
+
+  @Test
+  public void skip_promote_pending_member_by_direct_add() throws NotAbleToApplyGroupV2ChangeException {
+    ProfileKey             profileKey2  = randomProfileKey();
+    ProfileKey             profileKey3  = randomProfileKey();
+    DecryptedMember        member1      = member(UUID.randomUUID());
+    UUID                   pending2Uuid = UUID.randomUUID();
+    UUID                   pending3Uuid = UUID.randomUUID();
+    UUID                   pending4Uuid = UUID.randomUUID();
+    DecryptedPendingMember pending2     = pendingMember(pending2Uuid);
+    DecryptedPendingMember pending3     = pendingMember(pending3Uuid);
+    DecryptedPendingMember pending4     = pendingMember(pending4Uuid);
+    DecryptedMember        member2      = member(pending2Uuid, profileKey2);
+    DecryptedMember        member3      = member(pending3Uuid, profileKey3);
 
     DecryptedGroup newGroup = DecryptedGroupUtil.apply(DecryptedGroup.newBuilder()
                                                                      .setRevision(10)
                                                                      .addMembers(member1)
                                                                      .addPendingMembers(pending2)
+                                                                     .addPendingMembers(pending3)
+                                                                     .addPendingMembers(pending4)
                                                                      .build(),
                                                        DecryptedGroupChange.newBuilder()
                                                                            .setRevision(11)
-                                                                           .addPromotePendingMembers(member2)
+                                                                           .addNewMembers(member2)
+                                                                           .addNewMembers(member3)
                                                                            .build());
 
     assertEquals(DecryptedGroup.newBuilder()
                                .setRevision(11)
                                .addMembers(member1)
                                .addMembers(member2)
+                               .addMembers(member3)
+                               .addPendingMembers(pending4)
                                .build(),
                  newGroup);
   }
 
   @Test
-  public void title() throws DecryptedGroupUtil.NotAbleToApplyChangeException {
+  public void title() throws NotAbleToApplyGroupV2ChangeException {
     DecryptedGroup newGroup = DecryptedGroupUtil.apply(DecryptedGroup.newBuilder()
                                                                      .setRevision(10)
                                                                      .setTitle("Old title")
@@ -288,7 +473,7 @@ public final class DecryptedGroupUtil_apply_Test {
   }
 
   @Test
-  public void avatar() throws DecryptedGroupUtil.NotAbleToApplyChangeException {
+  public void avatar() throws NotAbleToApplyGroupV2ChangeException {
     DecryptedGroup newGroup = DecryptedGroupUtil.apply(DecryptedGroup.newBuilder()
                                                                      .setRevision(10)
                                                                      .setAvatar("https://cnd/oldavatar")
@@ -306,7 +491,7 @@ public final class DecryptedGroupUtil_apply_Test {
   }
 
   @Test
-  public void timer() throws DecryptedGroupUtil.NotAbleToApplyChangeException {
+  public void timer() throws NotAbleToApplyGroupV2ChangeException {
     DecryptedGroup newGroup = DecryptedGroupUtil.apply(DecryptedGroup.newBuilder()
                                                                      .setRevision(10)
                                                                      .setDisappearingMessagesTimer(DecryptedTimer.newBuilder().setDuration(100))
@@ -324,7 +509,7 @@ public final class DecryptedGroupUtil_apply_Test {
   }
 
   @Test
-  public void attribute_access() throws DecryptedGroupUtil.NotAbleToApplyChangeException {
+  public void attribute_access() throws NotAbleToApplyGroupV2ChangeException {
     DecryptedGroup newGroup = DecryptedGroupUtil.apply(DecryptedGroup.newBuilder()
                                                                      .setRevision(10)
                                                                      .setAccessControl(AccessControl.newBuilder()
@@ -348,7 +533,7 @@ public final class DecryptedGroupUtil_apply_Test {
   }
 
   @Test
-  public void membership_access() throws DecryptedGroupUtil.NotAbleToApplyChangeException {
+  public void membership_access() throws NotAbleToApplyGroupV2ChangeException {
     DecryptedGroup newGroup = DecryptedGroupUtil.apply(DecryptedGroup.newBuilder()
                                                                      .setRevision(10)
                                                                      .setAccessControl(AccessControl.newBuilder()
@@ -372,7 +557,7 @@ public final class DecryptedGroupUtil_apply_Test {
   }
 
   @Test
-  public void change_both_access_levels() throws DecryptedGroupUtil.NotAbleToApplyChangeException {
+  public void change_both_access_levels() throws NotAbleToApplyGroupV2ChangeException {
     DecryptedGroup newGroup = DecryptedGroupUtil.apply(DecryptedGroup.newBuilder()
                                                                      .setRevision(10)
                                                                      .setAccessControl(AccessControl.newBuilder()

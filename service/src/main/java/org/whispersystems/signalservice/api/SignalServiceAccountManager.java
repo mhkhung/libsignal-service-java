@@ -23,7 +23,6 @@ import org.whispersystems.libsignal.state.PreKeyRecord;
 import org.whispersystems.libsignal.state.SignedPreKeyRecord;
 import org.whispersystems.libsignal.util.ByteUtil;
 import org.whispersystems.libsignal.util.guava.Optional;
-import org.whispersystems.signalservice.FeatureFlags;
 import org.whispersystems.signalservice.api.crypto.InvalidCiphertextException;
 import org.whispersystems.signalservice.api.crypto.ProfileCipher;
 import org.whispersystems.signalservice.api.crypto.ProfileCipherOutputStream;
@@ -33,6 +32,7 @@ import org.whispersystems.signalservice.api.groupsv2.GroupsV2Operations;
 import org.whispersystems.signalservice.api.kbs.MasterKey;
 import org.whispersystems.signalservice.api.messages.calls.TurnServerInfo;
 import org.whispersystems.signalservice.api.messages.multidevice.DeviceInfo;
+import org.whispersystems.signalservice.api.profiles.ProfileAndCredential;
 import org.whispersystems.signalservice.api.profiles.SignalServiceProfile;
 import org.whispersystems.signalservice.api.profiles.SignalServiceProfileWrite;
 import org.whispersystems.signalservice.api.push.ContactTokenDetails;
@@ -78,12 +78,15 @@ import org.whispersystems.signalservice.internal.util.DynamicCredentialsProvider
 import org.whispersystems.signalservice.internal.util.Util;
 import org.whispersystems.util.Base64;
 
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
+import java.sql.Time;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -95,6 +98,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static org.whispersystems.signalservice.internal.push.ProvisioningProtos.ProvisionMessage;
@@ -384,66 +389,43 @@ public class SignalServiceAccountManager {
     return activeTokens;
   }
 
-  public List<String> getRegisteredUsers(KeyStore iasKeyStore, Set<String> e164numbers, String enclaveId)
+  public Map<String, UUID> getRegisteredUsers(KeyStore iasKeyStore, Set<String> e164numbers, String mrenclave)
       throws IOException, Quote.InvalidQuoteFormatException, UnauthenticatedQuoteException, SignatureException, UnauthenticatedResponseException
   {
     try {
-      String                 authorization     = pushServiceSocket.getContactDiscoveryAuthorization();
-      RemoteAttestation      remoteAttestation = RemoteAttestationUtil.getAndVerifyRemoteAttestation(pushServiceSocket, PushServiceSocket.ClientSet.ContactDiscovery, iasKeyStore, enclaveId, enclaveId, authorization);
-      List<String>           addressBook       = new LinkedList<>();
+      String                         authorization = this.pushServiceSocket.getContactDiscoveryAuthorization();
+      Map<String, RemoteAttestation> attestations  = RemoteAttestationUtil.getAndVerifyMultiRemoteAttestation(pushServiceSocket,
+                                                                                                              PushServiceSocket.ClientSet.ContactDiscovery,
+                                                                                                              iasKeyStore,
+                                                                                                              mrenclave,
+                                                                                                              mrenclave,
+                                                                                                              authorization);
+
+      List<String> addressBook = new ArrayList<>(e164numbers.size());
 
       for (String e164number : e164numbers) {
         addressBook.add(e164number.substring(1));
       }
 
-      DiscoveryRequest  request  = ContactDiscoveryCipher.createDiscoveryRequest(addressBook, remoteAttestation);
-      DiscoveryResponse response = pushServiceSocket.getContactDiscoveryRegisteredUsers(authorization, request, remoteAttestation.getCookies(), enclaveId);
-      byte[]            data     = ContactDiscoveryCipher.getDiscoveryResponseData(response, remoteAttestation);
+      List<String>      cookies  = attestations.values().iterator().next().getCookies();
+      DiscoveryRequest  request  = ContactDiscoveryCipher.createDiscoveryRequest(addressBook, attestations);
+      DiscoveryResponse response = this.pushServiceSocket.getContactDiscoveryRegisteredUsers(authorization, request, cookies, mrenclave);
+      byte[]            data     = ContactDiscoveryCipher.getDiscoveryResponseData(response, attestations.values());
 
-      Iterator<String> addressBookIterator = addressBook.iterator();
-      List<String>     results             = new LinkedList<>();
+      HashMap<String, UUID> results         = new HashMap<>(addressBook.size());
+      DataInputStream       uuidInputStream = new DataInputStream(new ByteArrayInputStream(data));
 
-      for (byte aData : data) {
-        String candidate = addressBookIterator.next();
-
-        if (aData != 0) results.add('+' + candidate);
+      for (String candidate : addressBook) {
+        long candidateUuidHigh = uuidInputStream.readLong();
+        long candidateUuidLow  = uuidInputStream.readLong();
+        if (candidateUuidHigh != 0 || candidateUuidLow != 0) {
+          results.put('+' + candidate, new UUID(candidateUuidHigh, candidateUuidLow));
+        }
       }
 
       return results;
     } catch (InvalidCiphertextException e) {
       throw new UnauthenticatedResponseException(e);
-    }
-  }
-
-  public void reportContactDiscoveryServiceMatch() {
-    try {
-      this.pushServiceSocket.reportContactDiscoveryServiceMatch();
-    } catch (IOException e) {
-      Log.w(TAG, "Request to indicate a contact discovery result match failed. Ignoring.", e);
-    }
-  }
-
-  public void reportContactDiscoveryServiceMismatch() {
-    try {
-      this.pushServiceSocket.reportContactDiscoveryServiceMismatch();
-    } catch (IOException e) {
-      Log.w(TAG, "Request to indicate a contact discovery result mismatch failed. Ignoring.", e);
-    }
-  }
-
-  public void reportContactDiscoveryServiceAttestationError(String reason) {
-    try {
-      this.pushServiceSocket.reportContactDiscoveryServiceAttestationError(reason);
-    } catch (IOException e) {
-      Log.w(TAG, "Request to indicate a contact discovery attestation error failed. Ignoring.", e);
-    }
-  }
-
-  public void reportContactDiscoveryServiceUnexpectedError(String reason) {
-    try {
-      this.pushServiceSocket.reportContactDiscoveryServiceUnexpectedError(reason);
-    } catch (IOException e) {
-      Log.w(TAG, "Request to indicate a contact discovery unexpected error failed. Ignoring.", e);
     }
   }
 
@@ -725,39 +707,6 @@ public class SignalServiceAccountManager {
     return this.pushServiceSocket.getTurnServerInfo();
   }
 
-  public void setProfileName(ProfileKey key, String name)
-      throws IOException
-  {
-    if (FeatureFlags.DISALLOW_OLD_PROFILE_SETTING) {
-      throw new AssertionError();
-    }
-
-    if (name == null) name = "";
-
-    String ciphertextName = Base64.encodeBytesWithoutPadding(new ProfileCipher(key).encryptName(name.getBytes(StandardCharsets.UTF_8), ProfileCipher.NAME_PADDED_LENGTH));
-
-    this.pushServiceSocket.setProfileName(ciphertextName);
-  }
-
-  public Optional<String> setProfileAvatar(ProfileKey key, StreamDetails avatar)
-      throws IOException
-  {
-    if (FeatureFlags.DISALLOW_OLD_PROFILE_SETTING) {
-      throw new AssertionError();
-    }
-
-    ProfileAvatarData profileAvatarData = null;
-
-    if (avatar != null) {
-      profileAvatarData = new ProfileAvatarData(avatar.getStream(),
-                                                ProfileCipherOutputStream.getCiphertextLength(avatar.getLength()),
-                                                avatar.getContentType(),
-                                                new ProfileCipherOutputStreamFactory(key));
-    }
-
-    return this.pushServiceSocket.setProfileAvatar(profileAvatarData);
-  }
-
   /**
    * @return The avatar URL path, if one was written.
    */
@@ -785,9 +734,22 @@ public class SignalServiceAccountManager {
   }
 
   public Optional<ProfileKeyCredential> resolveProfileKeyCredential(UUID uuid, ProfileKey profileKey)
-      throws NonSuccessfulResponseCodeException, PushNetworkException, VerificationFailedException
+      throws NonSuccessfulResponseCodeException, PushNetworkException
   {
-    return this.pushServiceSocket.retrieveVersionedProfileAndCredential(uuid, profileKey, Optional.absent()).getProfileKeyCredential();
+    try {
+      ProfileAndCredential credential = this.pushServiceSocket.retrieveVersionedProfileAndCredential(uuid, profileKey, Optional.absent()).get(10, TimeUnit.SECONDS);
+      return credential.getProfileKeyCredential();
+    } catch (InterruptedException | TimeoutException e) {
+      throw new PushNetworkException(e);
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof NonSuccessfulResponseCodeException) {
+        throw (NonSuccessfulResponseCodeException) e.getCause();
+      } else if (e.getCause() instanceof PushNetworkException) {
+        throw (PushNetworkException) e.getCause();
+      } else {
+        throw new PushNetworkException(e);
+      }
+    }
   }
 
   public void setUsername(String username) throws IOException {
