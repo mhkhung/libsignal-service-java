@@ -42,12 +42,12 @@ public class SignalServiceStickerManifestUpload {
 
     int i = 0;
     for (StickerInfo sticker : this.stickers) {
-      stickers.add(new SignalServiceStickerManifest.StickerInfo(i, sticker.emoji));
+      stickers.add(new SignalServiceStickerManifest.StickerInfo(i, sticker.emoji, sticker.contentType));
       i++;
     }
 
     SignalServiceStickerManifest.StickerInfo cover = this.cover.isPresent()
-                                                     ? new SignalServiceStickerManifest.StickerInfo(stickers.size(), this.cover.get().emoji)
+                                                     ? new SignalServiceStickerManifest.StickerInfo(stickers.size(), this.cover.get().emoji, this.cover.get().contentType)
                                                      : stickers.get(0);
 
     return new SignalServiceStickerManifest(title.orNull(), author.orNull(), cover, stickers);
@@ -57,11 +57,13 @@ public class SignalServiceStickerManifestUpload {
     private final InputStream inputStream;
     private final long        length;
     private final String      emoji;
+    private final String      contentType;
 
-    public StickerInfo(InputStream inputStream, long length, String emoji) {
+    public StickerInfo(InputStream inputStream, long length, String emoji, String contentType) {
       this.inputStream = inputStream;
       this.length      = length;
       this.emoji       = emoji;
+      this.contentType = contentType;
     }
 
     public InputStream getInputStream() {
@@ -74,6 +76,10 @@ public class SignalServiceStickerManifestUpload {
 
     public String getEmoji() {
       return emoji;
+    }
+
+    public String getContentType() {
+      return contentType;
     }
   }
 }

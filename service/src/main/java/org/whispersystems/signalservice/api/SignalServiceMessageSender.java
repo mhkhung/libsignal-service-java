@@ -694,6 +694,7 @@ public class SignalServiceMessageSender {
         quoteBuilder.setAuthorUuid(message.getQuote().get().getAuthor().getUuid().get().toString());
       }
 
+      // TODO [Alan] PhoneNumberPrivacy: Do not set this number
       if (message.getQuote().get().getAuthor().getNumber().isPresent()) {
         quoteBuilder.setAuthorE164(message.getQuote().get().getAuthor().getNumber().get());
       }
@@ -736,6 +737,8 @@ public class SignalServiceMessageSender {
       for (SignalServiceDataMessage.Preview preview : message.getPreviews().get()) {
         DataMessage.Preview.Builder previewBuilder = DataMessage.Preview.newBuilder();
         previewBuilder.setTitle(preview.getTitle());
+        previewBuilder.setDescription(preview.getDescription());
+        previewBuilder.setDate(preview.getDate());
         previewBuilder.setUrl(preview.getUrl());
 
         if (preview.getImage().isPresent()) {
@@ -766,6 +769,7 @@ public class SignalServiceMessageSender {
       stickerBuilder.setPackId(ByteString.copyFrom(message.getSticker().get().getPackId()));
       stickerBuilder.setPackKey(ByteString.copyFrom(message.getSticker().get().getPackKey()));
       stickerBuilder.setStickerId(message.getSticker().get().getStickerId());
+      stickerBuilder.setEmoji(message.getSticker().get().getEmoji());
 
       if (message.getSticker().get().getAttachment().isStream()) {
         stickerBuilder.setData(createAttachmentPointer(message.getSticker().get().getAttachment().asStream()));
@@ -787,6 +791,7 @@ public class SignalServiceMessageSender {
                                                                          .setRemove(message.getReaction().get().isRemove())
                                                                          .setTargetSentTimestamp(message.getReaction().get().getTargetSentTimestamp());
 
+      // TODO [Alan] PhoneNumberPrivacy: Do not set this number
       if (message.getReaction().get().getTargetAuthor().getNumber().isPresent()) {
         reactionBuilder.setTargetAuthorE164(message.getReaction().get().getTargetAuthor().getNumber().get());
       }

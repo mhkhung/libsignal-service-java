@@ -728,8 +728,10 @@ public final class SignalServiceContent {
       }
 
       results.add(new SignalServiceDataMessage.Preview(preview.getUrl(),
-                              preview.getTitle(),
-                              Optional.fromNullable(attachment)));
+                                                       preview.getTitle(),
+                                                       preview.getDescription(),
+                                                       preview.getDate(),
+                                                       Optional.fromNullable(attachment)));
     }
 
     return results;
@@ -777,9 +779,10 @@ public final class SignalServiceContent {
     SignalServiceProtos.DataMessage.Sticker sticker = content.getSticker();
 
     return new SignalServiceDataMessage.Sticker(sticker.getPackId().toByteArray(),
-                       sticker.getPackKey().toByteArray(),
-                       sticker.getStickerId(),
-                       createAttachmentPointer(sticker.getData()));
+                                                sticker.getPackKey().toByteArray(),
+                                                sticker.getStickerId(),
+                                                sticker.getEmoji(),
+                                                createAttachmentPointer(sticker.getData()));
   }
 
   private static SignalServiceDataMessage.Reaction createReaction(SignalServiceProtos.DataMessage content) {
