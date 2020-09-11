@@ -162,7 +162,7 @@ public class SignalServiceAccountManager {
     this.credentialsProvider = credentialsProvider;
     this.provisioningSocket  = new ProvisioningSocket(configuration, signalAgent, timer);
     this.groupsV2Operations = groupsV2Operations;
-    this.pushServiceSocket  = new PushServiceSocket(configuration, credentialsProvider, signalAgent, groupsV2Operations.getProfileOperations());
+    this.pushServiceSocket  = new PushServiceSocket(configuration, credentialsProvider, signalAgent, groupsV2Operations == null ? null : groupsV2Operations.getProfileOperations());
   }
 
   public byte[] getSenderCertificate() throws IOException {
