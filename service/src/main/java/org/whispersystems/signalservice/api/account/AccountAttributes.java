@@ -4,8 +4,9 @@
  * Licensed according to the LICENSE file in this repository.
  */
 
-package org.whispersystems.signalservice.internal.push;
+package org.whispersystems.signalservice.api.account;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import org.whispersystems.signalservice.api.profiles.SignalServiceProfile;
@@ -43,7 +44,7 @@ public class AccountAttributes {
   private boolean discoverableByPhoneNumber;
 
   @JsonProperty
-  private SignalServiceProfile.Capabilities capabilities;
+  private Capabilities capabilities;
 
   public AccountAttributes(String signalingKey,
                            int registrationId,
@@ -52,7 +53,7 @@ public class AccountAttributes {
                            String registrationLock,
                            byte[] unidentifiedAccessKey,
                            boolean unrestrictedUnidentifiedAccess,
-                           SignalServiceProfile.Capabilities capabilities,
+                           Capabilities capabilities,
                            boolean discoverableByPhoneNumber)
   {
     this.signalingKey                   = signalingKey;
@@ -110,7 +111,47 @@ public class AccountAttributes {
     return discoverableByPhoneNumber;
   }
 
-  public SignalServiceProfile.Capabilities getCapabilities() {
+  public Capabilities getCapabilities() {
     return capabilities;
+  }
+
+  public static class Capabilities {
+    @JsonProperty
+    private boolean uuid;
+
+    @JsonProperty("gv2-3")
+    private boolean gv2;
+
+    @JsonProperty
+    private boolean storage;
+
+    @JsonProperty("gv1-migration")
+    private boolean gv1Migration;
+
+    @JsonCreator
+    public Capabilities() {}
+
+    public Capabilities(boolean uuid, boolean gv2, boolean storage, boolean gv1Migration) {
+      this.uuid         = uuid;
+      this.gv2          = gv2;
+      this.storage      = storage;
+      this.gv1Migration = gv1Migration;
+    }
+
+    public boolean isUuid() {
+      return uuid;
+    }
+
+    public boolean isGv2() {
+      return gv2;
+    }
+
+    public boolean isStorage() {
+      return storage;
+    }
+
+    public boolean isGv1Migration() {
+      return gv1Migration;
+    }
   }
 }
