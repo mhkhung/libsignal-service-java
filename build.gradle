@@ -1,5 +1,5 @@
 subprojects {
-    ext.lib_signal_service_version_number = "2.15.3_unofficial_14"
+    ext.lib_signal_service_version_number = "2.15.3_unofficial_15"
     ext.lib_signal_service_group_info     = "com.github.turasa"
     ext.lib_signal_metadata_version       = "0.1.2"
 
