@@ -391,7 +391,7 @@ public class SignalServiceAccountManager {
   }
 
   public Map<String, UUID> getRegisteredUsers(KeyStore iasKeyStore, Set<String> e164numbers, String mrenclave)
-      throws IOException, Quote.InvalidQuoteFormatException, UnauthenticatedQuoteException, SignatureException, UnauthenticatedResponseException
+      throws IOException, Quote.InvalidQuoteFormatException, UnauthenticatedQuoteException, SignatureException, UnauthenticatedResponseException, InvalidKeyException
   {
     if (e164numbers.isEmpty()) {
       return Collections.emptyMap();
@@ -759,6 +759,10 @@ public class SignalServiceAccountManager {
 
   public void deleteUsername() throws IOException {
     this.pushServiceSocket.deleteUsername();
+  }
+
+  public void deleteAccount() throws IOException {
+    this.pushServiceSocket.deleteAccount();
   }
 
   public void setSoTimeoutMillis(long soTimeoutMillis) {

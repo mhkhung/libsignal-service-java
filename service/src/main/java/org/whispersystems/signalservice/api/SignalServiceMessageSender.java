@@ -137,7 +137,7 @@ public class SignalServiceMessageSender {
   private final AtomicBoolean                                       isMultiDevice;
 
   private final ExecutorService                                     executor;
-  private final int                                                 maxEnvelopeSize;
+  private final long                                                maxEnvelopeSize;
 
   /**
    * Construct a SignalServiceMessageSender.
@@ -161,7 +161,7 @@ public class SignalServiceMessageSender {
                                     Optional<EventListener> eventListener,
                                     ClientZkProfileOperations clientZkProfileOperations,
                                     ExecutorService executor,
-                                    int maxEnvelopeSize)
+                                    long maxEnvelopeSize)
   {
     this(urls, new StaticCredentialsProvider(uuid, e164, password, null, deviceId), store, userAgent, isMultiDevice, pipe, unidentifiedPipe, eventListener, clientZkProfileOperations, executor, maxEnvelopeSize);
   }
@@ -202,7 +202,7 @@ public class SignalServiceMessageSender {
                                     Optional<EventListener> eventListener,
                                     ClientZkProfileOperations clientZkProfileOperations,
                                     ExecutorService executor,
-                                    int maxEnvelopeSize)
+                                    long maxEnvelopeSize)
   {
     this.credentialsProvider = credentialsProvider;
     this.socket           = new PushServiceSocket(urls, credentialsProvider, signalAgent, clientZkProfileOperations);
@@ -643,6 +643,7 @@ public class SignalServiceMessageSender {
 
     if      (message.isDeliveryReceipt()) builder.setType(ReceiptMessage.Type.DELIVERY);
     else if (message.isReadReceipt())     builder.setType(ReceiptMessage.Type.READ);
+    else if (message.isViewedReceipt())   builder.setType(ReceiptMessage.Type.VIEWED);
 
     return container.setReceiptMessage(builder).build().toByteArray();
   }
@@ -820,6 +821,10 @@ public class SignalServiceMessageSender {
                                                     .setTargetSentTimestamp(message.getRemoteDelete().get().getTargetSentTimestamp())
                                                     .build();
       builder.setDelete(delete);
+    }
+
+    if (message.getGroupCallUpdate().isPresent()) {
+      builder.setGroupCallUpdate(DataMessage.GroupCallUpdate.newBuilder().setEraId(message.getGroupCallUpdate().get().getEraId()));
     }
 
     builder.setTimestamp(message.getTimestamp());

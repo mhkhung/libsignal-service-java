@@ -169,6 +169,7 @@ public class PushServiceSocket {
   private static final String WHO_AM_I                  = "/v1/accounts/whoami";
   private static final String SET_USERNAME_PATH         = "/v1/accounts/username/%s";
   private static final String DELETE_USERNAME_PATH      = "/v1/accounts/username";
+  private static final String DELETE_ACCOUNT_PATH       = "/v1/accounts/me";
 
   private static final String PREKEY_METADATA_PATH      = "/v2/keys/";
   private static final String PREKEY_PATH               = "/v2/keys/%s";
@@ -220,6 +221,8 @@ public class PushServiceSocket {
   private static final ResponseCodeHandler NO_HANDLER = new EmptyResponseCodeHandler();
 
   private static final long CDN2_RESUMABLE_LINK_LIFETIME_MILLIS = TimeUnit.DAYS.toMillis(7);
+
+  private static final int MAX_FOLLOW_UPS = 20;
 
   private       long      soTimeoutMillis = TimeUnit.SECONDS.toMillis(30);
   private final Set<Call> connections     = new HashSet<>();
@@ -760,6 +763,10 @@ public class PushServiceSocket {
 
   public void deleteUsername() throws IOException {
     makeServiceRequest(DELETE_USERNAME_PATH, "DELETE", null);
+  }
+
+  public void deleteAccount() throws IOException {
+    makeServiceRequest(DELETE_ACCOUNT_PATH, "DELETE", null);
   }
 
   public List<ContactTokenDetails> retrieveDirectory(Set<String> contactTokens)
@@ -1716,7 +1723,7 @@ public class PushServiceSocket {
     ConnectionHolder connectionHolder = getRandom(serviceClients, random);
     OkHttpClient     okHttpClient     = connectionHolder.getClient()
                                                         .newBuilder()
-                                                        .followRedirects(true)
+                                                        .followRedirects(false)
                                                         .connectTimeout(soTimeoutMillis, TimeUnit.MILLISECONDS)
                                                         .readTimeout(soTimeoutMillis, TimeUnit.MILLISECONDS)
                                                         .build();
@@ -1732,21 +1739,35 @@ public class PushServiceSocket {
       }
     }
 
-    Call call = okHttpClient.newCall(builder.build());
+    Request request = builder.build();
 
-    try {
-      Response response       = call.execute();
-      int      responseStatus = response.code();
-      byte[]   responseBody   = response.body() != null ? response.body().bytes() : new byte[0];
+    for (int i = 0; i < MAX_FOLLOW_UPS; i++) {
+      try (Response response = okHttpClient.newCall(request).execute()) {
+        int responseStatus = response.code();
 
-      return new CallingResponse.Success(requestId, responseStatus, responseBody);
-    } catch (IOException e) {
-      Log.w(TAG, "Exception during ringrtc http call.", e);
-      return new CallingResponse.Error(requestId, e);
+        if (responseStatus != 307) {
+          return new CallingResponse.Success(requestId,
+                                             responseStatus,
+                                             response.body() != null ? response.body().bytes() : new byte[0]);
+        }
+
+        String  location = response.header("Location");
+        HttpUrl newUrl   = location != null ? request.url().resolve(location) : null;
+
+        if (newUrl != null) {
+          request = request.newBuilder().url(newUrl).build();
+        } else {
+          return new CallingResponse.Error(requestId, new IOException("Received redirect without a valid Location header"));
+        }
+      } catch (IOException e) {
+        Log.w(TAG, "Exception during ringrtc http call.", e);
+        return new CallingResponse.Error(requestId, e);
+      }
     }
+
+    Log.w(TAG, "Calling request max redirects exceeded");
+    return new CallingResponse.Error(requestId, new IOException("Redirect limit exceeded"));
   }
-
-
 
   private ServiceConnectionHolder[] createServiceConnectionHolders(SignalUrl[] urls,
                                                                    List<Interceptor> interceptors,
