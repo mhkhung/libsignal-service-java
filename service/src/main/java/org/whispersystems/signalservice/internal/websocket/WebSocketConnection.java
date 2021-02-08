@@ -27,6 +27,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Arrays;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -90,10 +91,11 @@ public class WebSocketConnection extends WebSocketListener {
     this.attempts            = 0;
     this.connected           = false;
 
-    String uri = httpUri.replace("https://", "wss://").replace("http://", "ws://");
+    // Allow local dev
+    //String uri = httpUri.replace("https://", "wss://").replace("http://", "ws://");
 
-    if (credentialsProvider.isPresent()) this.wsUri = uri + "/v1/websocket/?login=%s&password=%s";
-    else                                 this.wsUri = uri + "/v1/websocket/";
+    if (credentialsProvider.isPresent()) this.wsUri = httpUri + "/v1/websocket/?login=%s&password=%s";
+    else                                 this.wsUri = httpUri + "/v1/websocket/";
   }
   
   public WebSocketConnection(String httpUri, TrustStore trustStore, String signalAgent, ConnectivityListener listener,
@@ -107,8 +109,7 @@ public class WebSocketConnection extends WebSocketListener {
     this.dns                 = dns;
     this.attempts            = 0;
     this.connected           = false;
-    this.wsUri               = httpUri.replace("https://", "wss://")
-                                      .replace("http://", "ws://") + "/v1/websocket/provisioning/";
+    this.wsUri               = httpUri + "/v1/websocket/provisioning/";
   }
 
   public synchronized void connect() {
@@ -130,7 +131,7 @@ public class WebSocketConnection extends WebSocketListener {
 
       OkHttpClient.Builder clientBuilder = new OkHttpClient.Builder()
                                                            .sslSocketFactory(new Tls12SocketFactory(socketFactory.first()), socketFactory.second())
-                                                           .connectionSpecs(Util.immutableList(ConnectionSpec.RESTRICTED_TLS))
+                                                           .connectionSpecs(Arrays.asList(ConnectionSpec.MODERN_TLS, ConnectionSpec.CLEARTEXT))
                                                            .readTimeout(KEEPALIVE_TIMEOUT_SECONDS + 10, TimeUnit.SECONDS)
                                                            .dns(dns.or(Dns.SYSTEM))
                                                            .connectTimeout(KEEPALIVE_TIMEOUT_SECONDS + 10, TimeUnit.SECONDS);

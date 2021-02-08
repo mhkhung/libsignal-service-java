@@ -1795,25 +1795,34 @@ public class PushServiceSocket {
 
   private static OkHttpClient createConnectionClient(SignalUrl url, List<Interceptor> interceptors, Optional<Dns> dns) {
     try {
-      TrustManager[] trustManagers = BlacklistingTrustManager.createFor(url.getTrustStore());
+      if (url.getTrustStore() != null) {
+        TrustManager[] trustManagers = BlacklistingTrustManager.createFor(url.getTrustStore());
 
-      SSLContext context = SSLContext.getInstance("TLS");
-      context.init(null, trustManagers, null);
-
-      OkHttpClient.Builder builder = new OkHttpClient.Builder()
-                                                     .sslSocketFactory(new Tls12SocketFactory(context.getSocketFactory()), (X509TrustManager)trustManagers[0])
-                                                     .connectionSpecs(url.getConnectionSpecs().or(Util.immutableList(ConnectionSpec.RESTRICTED_TLS)))
-                                                     .dns(dns.or(Dns.SYSTEM));
-
-      builder.sslSocketFactory(new Tls12SocketFactory(context.getSocketFactory()), (X509TrustManager)trustManagers[0])
-             .connectionSpecs(url.getConnectionSpecs().or(Util.immutableList(ConnectionSpec.RESTRICTED_TLS)))
-             .build();
-
-      for (Interceptor interceptor : interceptors) {
-        builder.addInterceptor(interceptor);
+        SSLContext context = SSLContext.getInstance("TLS");
+        context.init(null, trustManagers, null);
+  
+        OkHttpClient.Builder builder = new OkHttpClient.Builder()
+                                                       .sslSocketFactory(new Tls12SocketFactory(context.getSocketFactory()), (X509TrustManager)trustManagers[0])
+                                                       .connectionSpecs(url.getConnectionSpecs().or(Util.immutableList(ConnectionSpec.RESTRICTED_TLS)))
+                                                       .dns(dns.or(Dns.SYSTEM));
+  
+        builder.sslSocketFactory(new Tls12SocketFactory(context.getSocketFactory()), (X509TrustManager)trustManagers[0])
+               .connectionSpecs(url.getConnectionSpecs().or(Util.immutableList(ConnectionSpec.RESTRICTED_TLS)))
+               .build();
+  
+        for (Interceptor interceptor : interceptors) {
+          builder.addInterceptor(interceptor);
+        }
+  
+        return builder.build();  
       }
-
-      return builder.build();
+      else {
+        OkHttpClient.Builder builder = new OkHttpClient.Builder();
+        for (Interceptor interceptor : interceptors) {
+          builder.addInterceptor(interceptor);
+        }
+        return builder.build();
+      }
     } catch (NoSuchAlgorithmException | KeyManagementException e) {
       throw new AssertionError(e);
     }
