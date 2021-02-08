@@ -1649,7 +1649,7 @@ public class SignalServiceMessageSender {
     }
 
     for (int deviceId : store.getSubDeviceSessions(recipient.getIdentifier())) {
-      if ((!myself || deviceId != credentialsProvider.getDeviceId()) &&
+      if ((!myself || deviceId != credentialsProvider.getDeviceId() || unidentifiedAccess.isPresent()) &&
           store.containsSession(new SignalProtocolAddress(recipient.getIdentifier(), deviceId))) {
         messages.add(getEncryptedMessage(socket, recipient, unidentifiedAccess, deviceId, plaintext));
       }
@@ -1672,11 +1672,7 @@ public class SignalServiceMessageSender {
       try {
         List<PreKeyBundle> preKeys = socket.getPreKeys(recipient, unidentifiedAccess, deviceId);
 
-        final SignalServiceAddress senderSignalServiceAddress = new SignalServiceAddress(credentialsProvider.getUuid(), credentialsProvider.getE164());
         for (PreKeyBundle preKey : preKeys) {
-          if (senderSignalServiceAddress.matches(recipient) && credentialsProvider.getDeviceId() == preKey.getDeviceId()) {
-            continue;
-          }
           try {
             SignalProtocolAddress preKeyAddress  = new SignalProtocolAddress(recipient.getIdentifier(), preKey.getDeviceId());
             SessionBuilder        sessionBuilder = new SessionBuilder(store, preKeyAddress);
